@@ -69,6 +69,38 @@ type BracketMatch = {
   l?: number | null;
 };
 
+type SleeperTransaction = {
+  type: "trade" | "waiver" | "free_agent";
+  transaction_id: string;
+  status: string;
+  leg: number;
+  created: number;
+  roster_ids: number[];
+  adds: Record<string, number> | null;
+  drops: Record<string, number> | null;
+  settings: { waiver_bid?: number } | null;
+  draft_picks: Array<{
+    season: string;
+    round: number;
+    roster_id: number;
+    previous_owner_id: number;
+    owner_id: number;
+  }>;
+  waiver_budget: Array<{
+    sender: number;
+    receiver: number;
+    amount: number;
+  }>;
+};
+
+type SleeperPlayer = {
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  position?: string;
+  team?: string;
+};
+
 export type Team = {
   rosterId: number;
   userId: string;
@@ -150,6 +182,48 @@ export type LeagueData = {
   allTime: AllTimeManager[];
   completedSeasonCount: number;
   currentSeason: string;
+};
+
+export type LeagueTransaction = {
+  id: string;
+  type: "trade" | "waiver" | "free_agent";
+  week: number;
+  created: number;
+  waiverBid: number | null;
+  teams: Array<{
+    rosterId: number;
+    teamName: string;
+    manager: string;
+    adds: Array<{ id: string; name: string; position: string; nflTeam: string }>;
+    drops: Array<{
+      id: string;
+      name: string;
+      position: string;
+      nflTeam: string;
+    }>;
+  }>;
+  draftPicks: Array<{
+    season: string;
+    round: number;
+    from: string;
+    to: string;
+  }>;
+  faabTransfers: Array<{
+    amount: number;
+    from: string;
+    to: string;
+  }>;
+};
+
+export type TransactionFeed = {
+  season: string;
+  transactions: LeagueTransaction[];
+  counts: {
+    all: number;
+    trade: number;
+    waiver: number;
+    free_agent: number;
+  };
 };
 
 async function sleeperFetch<T>(path: string): Promise<T> {
@@ -352,5 +426,142 @@ export async function getLeagueData(): Promise<LeagueData> {
       (season) => season.status === "complete",
     ).length,
     currentSeason: seasons[0]?.year ?? new Date().getFullYear().toString(),
+  };
+}
+
+async function getLeagueForSeason(season: string) {
+  let leagueId: string | null = CURRENT_LEAGUE_ID;
+  let attempts = 0;
+
+  while (leagueId && attempts < 10) {
+    const league = await sleeperFetch<SleeperLeague>(`/league/${leagueId}`);
+    if (league.season === season) return league;
+    leagueId = league.previous_league_id;
+    attempts += 1;
+  }
+
+  throw new Error(`No Game of Inches league exists for ${season}.`);
+}
+
+function playerLabel(
+  playerId: string,
+  players: Record<string, SleeperPlayer>,
+) {
+  const player = players[playerId];
+  return {
+    id: playerId,
+    name:
+      player?.full_name ||
+      [player?.first_name, player?.last_name].filter(Boolean).join(" ") ||
+      playerId,
+    position: player?.position ?? (playerId.length <= 3 ? "DEF" : ""),
+    nflTeam: player?.team ?? (playerId.length <= 3 ? playerId : ""),
+  };
+}
+
+export async function getTransactionFeed(
+  season: string,
+): Promise<TransactionFeed> {
+  const league = await getLeagueForSeason(season);
+  const [users, rosters, players, weeklyTransactions] = await Promise.all([
+    sleeperFetch<SleeperUser[]>(`/league/${league.league_id}/users`),
+    sleeperFetch<SleeperRoster[]>(`/league/${league.league_id}/rosters`),
+    sleeperFetch<Record<string, SleeperPlayer>>("/players/nfl"),
+    Promise.all(
+      Array.from({ length: 19 }, (_, week) =>
+        sleeperFetch<SleeperTransaction[]>(
+          `/league/${league.league_id}/transactions/${week}`,
+        ),
+      ),
+    ),
+  ]);
+
+  const usersById = new Map(users.map((user) => [user.user_id, user]));
+  const teamByRoster = new Map(
+    rosters.map((roster) => {
+      const user = usersById.get(roster.owner_id);
+      const manager = user?.display_name ?? `Roster ${roster.roster_id}`;
+      return [
+        roster.roster_id,
+        {
+          teamName: user?.metadata?.team_name || `${manager}'s Team`,
+          manager,
+        },
+      ];
+    }),
+  );
+  const teamName = (rosterId: number) =>
+    teamByRoster.get(rosterId)?.teamName ?? `Roster ${rosterId}`;
+
+  const seen = new Set<string>();
+  const transactions = weeklyTransactions
+    .flat()
+    .filter((transaction) => {
+      if (
+        transaction.status !== "complete" ||
+        !["trade", "waiver", "free_agent"].includes(transaction.type) ||
+        seen.has(transaction.transaction_id)
+      ) {
+        return false;
+      }
+      seen.add(transaction.transaction_id);
+      return true;
+    })
+    .map<LeagueTransaction>((transaction) => {
+      const rosterIds = new Set<number>(transaction.roster_ids ?? []);
+      for (const rosterId of Object.values(transaction.adds ?? {})) {
+        rosterIds.add(Number(rosterId));
+      }
+      for (const rosterId of Object.values(transaction.drops ?? {})) {
+        rosterIds.add(Number(rosterId));
+      }
+
+      return {
+        id: transaction.transaction_id,
+        type: transaction.type,
+        week: transaction.leg ?? 0,
+        created: transaction.created,
+        waiverBid: transaction.settings?.waiver_bid ?? null,
+        teams: [...rosterIds].map((rosterId) => {
+          const team = teamByRoster.get(rosterId);
+          const adds = Object.entries(transaction.adds ?? {})
+            .filter(([, targetRoster]) => Number(targetRoster) === rosterId)
+            .map(([playerId]) => playerLabel(playerId, players));
+          const drops = Object.entries(transaction.drops ?? {})
+            .filter(([, sourceRoster]) => Number(sourceRoster) === rosterId)
+            .map(([playerId]) => playerLabel(playerId, players));
+          return {
+            rosterId,
+            teamName: team?.teamName ?? `Roster ${rosterId}`,
+            manager: team?.manager ?? `Roster ${rosterId}`,
+            adds,
+            drops,
+          };
+        }),
+        draftPicks: (transaction.draft_picks ?? []).map((pick) => ({
+          season: pick.season,
+          round: pick.round,
+          from: teamName(pick.previous_owner_id),
+          to: teamName(pick.owner_id),
+        })),
+        faabTransfers: (transaction.waiver_budget ?? []).map((transfer) => ({
+          amount: transfer.amount,
+          from: teamName(transfer.sender),
+          to: teamName(transfer.receiver),
+        })),
+      };
+    })
+    .sort((a, b) => b.created - a.created);
+
+  return {
+    season,
+    transactions,
+    counts: {
+      all: transactions.length,
+      trade: transactions.filter((item) => item.type === "trade").length,
+      waiver: transactions.filter((item) => item.type === "waiver").length,
+      free_agent: transactions.filter((item) => item.type === "free_agent")
+        .length,
+    },
   };
 }

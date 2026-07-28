@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { KeeperRecord } from "../lib/keepers";
 import type {
   AllTimeManager,
   DraftPick,
@@ -26,6 +27,7 @@ import type {
   Season,
   Team,
 } from "../lib/sleeper";
+import TransactionHistory from "./TransactionHistory";
 
 function avatarUrl(avatar: string | null) {
   return avatar ? `https://sleepercdn.com/avatars/thumbs/${avatar}` : null;
@@ -156,7 +158,13 @@ function DraftCard({ pick }: { pick: DraftPick }) {
   );
 }
 
-export default function LeagueDashboard({ data }: { data: LeagueData }) {
+export default function LeagueDashboard({
+  data,
+  keepers,
+}: {
+  data: LeagueData;
+  keepers: KeeperRecord[];
+}) {
   const current = data.seasons[0];
   const completedSeasons = data.seasons.filter(
     (season) => season.status === "complete",
@@ -170,6 +178,7 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
   );
   const [draftRound, setDraftRound] = useState(1);
   const [draftSearch, setDraftSearch] = useState("");
+  const [keeperYear, setKeeperYear] = useState(current.year);
 
   const archive =
     data.seasons.find((season) => season.year === archiveYear) ??
@@ -202,8 +211,11 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
   const topScorer = [...archive.teams].sort(
     (a, b) => b.pointsFor - a.pointsFor,
   )[0];
-  const currentKeepers =
-    current.draft?.picks.filter((pick) => pick.isKeeper) ?? [];
+  const keeperYears = [...new Set([current.year, ...keepers.map((item) => item.season)])]
+    .sort((a, b) => Number(b) - Number(a));
+  const selectedKeepers = keepers.filter((item) => item.season === keeperYear);
+  const keeperTeams = data.seasons.find((item) => item.year === keeperYear)?.teams ??
+    current.teams;
   const allTimeLeader = data.allTime[0];
   const mostPoints = [...data.allTime].sort(
     (a, b) => b.pointsFor - a.pointsFor,
@@ -238,6 +250,7 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
           <a href="#franchises">Teams</a>
           <a href="#history">History</a>
           <a href="#drafts">Drafts</a>
+          <a href="#transactions">Moves</a>
           <a href="#keepers">Keepers</a>
         </div>
         <a
@@ -641,42 +654,98 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
         </div>
       </section>
 
+      <TransactionHistory
+        seasons={data.seasons.map((season) => season.year)}
+        defaultSeason={latestCompleted?.year ?? current.year}
+      />
+
       <section className="content-section keeper-section" id="keepers">
         <div className="section-heading">
           <div>
-            <span className="section-number">05 / KEEPER DESK</span>
-            <h2>{current.year} keeper board</h2>
+            <span className="section-number">06 / KEEPER DESK</span>
+            <h2>{keeperYear} keeper board</h2>
           </div>
           <p>
-            The league allows up to {current.settings.maxKeepers} keepers per
-            franchise. Official Sleeper selections appear here automatically.
+            The official manual ledger: up to {current.settings.maxKeepers}{" "}
+            keepers per franchise, with their draft cost and eligibility clock.
           </p>
         </div>
 
-        {currentKeepers.length ? (
-          <div className="keeper-grid">
-            {currentKeepers.map((pick) => (
-              <article className="keeper-card" key={pick.playerId}>
-                <ShieldCheck size={22} aria-hidden="true" />
-                <span>{pick.position}</span>
-                <strong>{pick.playerName}</strong>
-                <small>{pick.teamName}</small>
-              </article>
+        <div className="keeper-toolbar">
+          <div className="year-tabs keeper-years" aria-label="Keeper season">
+            {keeperYears.map((year) => (
+              <button
+                type="button"
+                key={year}
+                className={keeperYear === year ? "active" : ""}
+                onClick={() => setKeeperYear(year)}
+              >
+                {year}
+              </button>
             ))}
+          </div>
+          <div className="keeper-legend">
+            <span><i className="year-three" /> Trade reset</span>
+            <span><i className="year-two" /> First keeper year</span>
+            <span><i className="year-one" /> Final year</span>
+          </div>
+        </div>
+
+        {selectedKeepers.length ? (
+          <div className="keeper-history-grid">
+            {keeperTeams.map((team) => {
+              const teamKeepers = selectedKeepers
+                .filter((keeper) => keeper.rosterId === team.rosterId)
+                .sort((a, b) => a.slot - b.slot);
+              if (!teamKeepers.length) return null;
+              return (
+                <article className="keeper-history-team" key={team.rosterId}>
+                  <div className="keeper-history-head">
+                    <TeamAvatar team={team} size="small" />
+                    <div>
+                      <strong>{teamKeepers[0]?.teamName || team.teamName}</strong>
+                      <span>@{teamKeepers[0]?.managerName || team.manager}</span>
+                    </div>
+                  </div>
+                  {teamKeepers.map((keeper) => (
+                    <div
+                      className={`keeper-history-player years-${keeper.yearsRemaining}`}
+                      key={`${keeper.rosterId}-${keeper.slot}`}
+                    >
+                      <ShieldCheck size={18} aria-hidden="true" />
+                      <div>
+                        <strong>{keeper.playerName}</strong>
+                        <span>
+                          {keeper.position || "Keeper"}{" "}
+                          {keeper.nflTeam ? `· ${keeper.nflTeam}` : ""}
+                        </span>
+                      </div>
+                      <div className="keeper-cost">
+                        <span>Cost</span>
+                        <strong>R{keeper.costRound}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="keeper-open">
             <div className="keeper-open-copy">
               <span className="open-stamp">SELECTIONS OPEN</span>
-              <h3>No keeper declarations are posted on Sleeper yet.</h3>
+              <h3>No official {keeperYear} keepers are locked yet.</h3>
               <p>
-                Each franchise has two slots waiting. Once a keeper is formally
-                assigned to the {current.year} draft, the board will update on
-                the next refresh.
+                Each franchise has two slots waiting. The commissioner portal
+                is the source of truth because Sleeper only receives keepers
+                when the draft board is finalized.
               </p>
+              <a className="button button--keeper" href="/admin">
+                Open commissioner desk <Crown size={16} aria-hidden="true" />
+              </a>
             </div>
             <div className="keeper-slots">
-              {current.teams.map((team) => (
+              {keeperTeams.map((team) => (
                 <div key={team.rosterId}>
                   <TeamAvatar team={team} size="small" />
                   <span>{team.teamName}</span>
@@ -687,6 +756,13 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
             </div>
           </div>
         )}
+
+        <div className="keeper-rules">
+          <div><span>01</span><strong>Costs move up one round each year</strong></div>
+          <div><span>02</span><strong>Waiver additions start at Round 8</strong></div>
+          <div><span>03</span><strong>Post–Round 10 picks cost Round 10</strong></div>
+          <div><span>04</span><strong>Three-year max; trades reset the clock</strong></div>
+        </div>
       </section>
 
       <section className="rules-strip">
@@ -732,11 +808,9 @@ export default function LeagueDashboard({ data }: { data: LeagueData }) {
           decimal matters.
         </p>
         <a
-          href={`https://sleeper.com/leagues/${current.leagueId}`}
-          target="_blank"
-          rel="noreferrer"
+          href="/admin"
         >
-          View league <ArrowUpRight size={14} aria-hidden="true" />
+          Commissioner desk <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       </footer>
     </main>

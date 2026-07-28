@@ -1,12 +1,16 @@
 import LeagueDashboard from "./components/LeagueDashboard";
+import { getKeeperRecords } from "./lib/keepers";
 import { getLeagueData } from "./lib/sleeper";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   try {
-    const data = await getLeagueData();
-    return <LeagueDashboard data={data} />;
+    const [data, keepers] = await Promise.all([
+      getLeagueData(),
+      getKeeperRecords(),
+    ]);
+    return <LeagueDashboard data={data} keepers={keepers} />;
   } catch (error) {
     console.error("Unable to load Sleeper league data", error);
     return (
