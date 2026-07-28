@@ -613,19 +613,31 @@ function projectedCandidate(
   keepers: KeeperRecord[],
   sourceSeason: string,
 ) {
-  const previous = keepers.find(
+  const sameRoster = keepers.find(
     (keeper) =>
       keeper.season === sourceSeason &&
       keeper.rosterId === candidate.rosterId &&
       keeper.playerName.toLowerCase() === candidate.playerName.toLowerCase(),
   );
+  const previous =
+    sameRoster ??
+    keepers.find(
+      (keeper) =>
+        keeper.season === sourceSeason &&
+        keeper.playerName.toLowerCase() === candidate.playerName.toLowerCase(),
+    );
   if (!previous) return candidate;
+  const traded = candidate.acquisitionType === "trade";
   return {
     ...candidate,
     costRound: Math.max(1, previous.costRound - 1),
-    yearsRemaining: Math.max(0, previous.yearsRemaining - 1),
-    acquisitionType: previous.acquisitionType,
-    source: `Returning keeper · ${previous.yearsRemaining} years previously`,
+    yearsRemaining: traded
+      ? 3
+      : Math.max(0, previous.yearsRemaining - 1),
+    acquisitionType: traded ? "trade" : previous.acquisitionType,
+    source: traded
+      ? "Offseason trade · timer reset; keeper cost lineage retained"
+      : `Returning keeper · ${previous.yearsRemaining} years previously`,
   };
 }
 
@@ -745,6 +757,13 @@ export function KeeperWarRoom({
           </strong>
         </div>
       </div>
+      {!data.chaos.archiveReady && (
+        <div className="archive-indexing">
+          <Gauge size={16} aria-hidden="true" />
+          Candidates are reconstructed from the latest draft and transaction
+          ledger. The next scheduled sync will confirm final roster ownership.
+        </div>
+      )}
 
       <div className="keeper-lab-layout">
         <div className="keeper-candidate-panel">

@@ -30,6 +30,7 @@ import type {
   Team,
 } from "../lib/sleeper";
 import LeagueRecords from "./LeagueRecords";
+import PlayoffHistory from "./PlayoffHistory";
 import TransactionHistory from "./TransactionHistory";
 import {
   FranchiseDossier,
@@ -261,6 +262,11 @@ export default function LeagueDashboard({
           href: "/history/seasons",
           label: "Season archive",
           page: "history-seasons",
+        },
+        {
+          href: "/history/playoffs",
+          label: "Playoff history",
+          page: "history-playoffs",
         },
       ],
     },
@@ -740,6 +746,10 @@ export default function LeagueDashboard({
           </div>
         </div>
       </section>
+      )}
+
+      {activePage === "history-playoffs" && (
+        <PlayoffHistory data={data} />
       )}
 
       {activePage === "records" && (

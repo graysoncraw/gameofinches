@@ -17,6 +17,7 @@ test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
   assert.match(sleeper, /T\$\{window\}:00:00-America\/Chicago/);
   assert.match(sleeper, /fetched_date === today/);
   assert.match(sleeper, /if \(cached\) return cached/);
+  assert.match(sleeper, /losers_bracket/);
   assert.match(schema, /sleeperPlayerCache/);
   assert.match(transactions, /getTransactionFeed/);
   assert.doesNotMatch(transactions, /api\.sleeper\.app/);
@@ -88,9 +89,11 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(dashboard, /LeagueSuperlatives/);
   assert.match(dashboard, /nav-dropdown/);
   assert.match(dashboard, /\/history\/seasons/);
+  assert.match(dashboard, /\/history\/playoffs/);
   assert.match(dashboard, /\/records\/superlatives/);
   assert.match(dashboard, /\/keepers\/lab/);
   assert.match(historyViews, /history-seasons/);
+  assert.match(historyViews, /history-playoffs/);
   assert.match(recordViews, /records-elo/);
   assert.match(keeperViews, /keepers-rules/);
   assert.doesNotMatch(dashboard, /"chaos", "\/chaos", "Chaos"/);

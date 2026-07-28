@@ -2610,6 +2610,172 @@ footer > a {
   padding: 10px 12px;
 }
 
+.playoff-history-section {
+  background: #f0ede4;
+  min-height: 70vh;
+  padding: 95px clamp(24px, 7vw, 108px);
+}
+
+.playoff-history-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.playoff-history-toolbar > span {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.playoff-podium {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 36px;
+}
+
+.playoff-podium article {
+  background: var(--ink);
+  border-right: 1px solid rgba(255, 253, 247, 0.15);
+  color: var(--white);
+  min-height: 170px;
+  padding: 24px;
+}
+
+.playoff-podium article:first-child {
+  background: var(--orange);
+  color: var(--ink);
+}
+
+.playoff-podium article:last-child {
+  border-right: 0;
+}
+
+.playoff-podium svg {
+  margin-bottom: 24px;
+}
+
+.playoff-podium span,
+.playoff-podium small {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.playoff-podium strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 0.95;
+  margin: 8px 0;
+  text-transform: uppercase;
+}
+
+.playoff-round {
+  border-top: 3px solid var(--ink);
+  display: grid;
+  gap: 28px;
+  grid-template-columns: 120px minmax(0, 1fr);
+  padding: 28px 0 44px;
+}
+
+.playoff-round > div:first-child span,
+.playoff-round > div:first-child strong {
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.playoff-round > div:first-child span {
+  color: var(--orange);
+  font-weight: 900;
+}
+
+.playoff-round > div:first-child strong {
+  margin-top: 7px;
+}
+
+.playoff-matchup-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.playoff-matchup-grid > article {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 4px 4px 0 rgba(13, 22, 24, 0.08);
+}
+
+.playoff-matchup-grid > article.is-championship {
+  border-color: var(--orange);
+  box-shadow: 5px 5px 0 var(--orange);
+}
+
+.playoff-matchup-grid header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.playoff-matchup-grid header span,
+.playoff-matchup-grid header small,
+.playoff-team span {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.playoff-matchup-grid header span {
+  color: var(--orange);
+  font-weight: 900;
+}
+
+.playoff-matchup-grid header small,
+.playoff-team span {
+  color: var(--muted);
+}
+
+.playoff-team {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  min-height: 68px;
+  padding: 12px 14px;
+}
+
+.playoff-team + .playoff-team {
+  border-top: 1px solid var(--line);
+}
+
+.playoff-team strong,
+.playoff-team span {
+  display: block;
+}
+
+.playoff-team.is-winner strong,
+.playoff-team.is-winner b {
+  color: var(--orange);
+}
+
+.playoff-team b {
+  font-family: var(--font-display);
+  font-size: 30px;
+}
+
+.playoff-history-empty {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 40px;
+  text-align: center;
+}
+
 .records-section {
   background: #f0ede4;
   border-bottom: 1px solid var(--line);
@@ -3012,6 +3178,14 @@ footer > a {
 }
 
 @media (max-width: 850px) {
+  .playoff-round {
+    grid-template-columns: 1fr;
+  }
+
+  .playoff-matchup-grid {
+    grid-template-columns: 1fr;
+  }
+
   .topbar {
     padding-inline: 20px;
   }
@@ -3187,6 +3361,25 @@ footer > a {
 }
 
 @media (max-width: 620px) {
+  .playoff-history-section {
+    padding: 64px 20px;
+  }
+
+  .playoff-history-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .playoff-podium {
+    grid-template-columns: 1fr;
+  }
+
+  .playoff-podium article {
+    border-bottom: 1px solid rgba(255, 253, 247, 0.15);
+    border-right: 0;
+  }
+
   .mobile-nav-dropdown {
     grid-template-columns: 1fr;
   }

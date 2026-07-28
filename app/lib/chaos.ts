@@ -7,7 +7,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 2;
+export const CHAOS_SCHEMA_VERSION = 3;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -241,6 +241,7 @@ type ChaosInput = {
   games: RivalryGame[];
   teamFacts: WeeklyTeamFact[];
   playerFacts: WeeklyPlayerFact[];
+  rosterFacts: WeeklyPlayerFact[];
   transactions: Record<string, TransactionFeed>;
   archiveReady: boolean;
 };
@@ -1439,27 +1440,85 @@ export function buildKeeperCandidates(
   seasons: Season[],
   playerFacts: WeeklyPlayerFact[],
   transactions: Record<string, TransactionFeed>,
+  rosterFacts: WeeklyPlayerFact[] = [],
+  archiveReady = false,
 ): KeeperCandidate[] {
   const sourceSeason =
     seasons.find((season) => season.status === "complete") ?? seasons[1];
   if (!sourceSeason) return [];
-  const seasonFacts = playerFacts.filter(
-    (fact) => fact.season === sourceSeason.year,
+  const currentSeason = seasons[0] ?? sourceSeason;
+  const teamByRoster = new Map(
+    [...sourceSeason.teams, ...currentSeason.teams].map((team) => [
+      team.rosterId,
+      team,
+    ]),
   );
-  const latestWeek = Math.max(0, ...seasonFacts.map((fact) => fact.week));
-  const finalRoster = seasonFacts.filter((fact) => fact.week === latestWeek);
   const draftByPlayer = new Map(
     (sourceSeason.draft?.picks ?? []).map((pick) => [pick.playerId, pick]),
   );
+  const details = new Map<
+    string,
+    {
+      playerName: string;
+      position: string;
+      nflTeam: string;
+    }
+  >(
+    (sourceSeason.draft?.picks ?? []).map((pick) => [
+      pick.playerId,
+      {
+        playerName: pick.playerName,
+        position: pick.position,
+        nflTeam: pick.nflTeam,
+      },
+    ]),
+  );
+  const ownership = new Map<string, number>();
   const acquisition = new Map<
     string,
     { type: KeeperCandidate["acquisitionType"]; rosterId: number }
   >();
-  for (const transaction of [
-    ...(transactions[sourceSeason.year]?.transactions ?? []),
-  ].sort((a, b) => a.created - b.created)) {
+  const exactRoster = rosterFacts.filter(
+    (fact) => fact.season === sourceSeason.year,
+  );
+  if (exactRoster.length) {
+    for (const fact of exactRoster) {
+      ownership.set(fact.playerId, fact.rosterId);
+      details.set(fact.playerId, {
+        playerName: fact.playerName,
+        position: fact.position,
+        nflTeam: fact.nflTeam,
+      });
+    }
+  } else {
+    for (const pick of sourceSeason.draft?.picks ?? []) {
+      ownership.set(pick.playerId, pick.rosterId);
+    }
+  }
+  const orderedTransactions = Object.entries(transactions)
+    .filter(([season]) => Number(season) >= Number(sourceSeason.year))
+    .flatMap(([season, feed]) =>
+      feed.transactions.map((transaction) => ({ season, transaction })),
+    )
+    .sort((a, b) => a.transaction.created - b.transaction.created);
+  for (const { season, transaction } of orderedTransactions) {
+    const updateOwnership =
+      !exactRoster.length || Number(season) > Number(sourceSeason.year);
     for (const side of transaction.teams) {
+      if (updateOwnership) {
+        for (const player of side.drops) {
+          if (ownership.get(player.id) === side.rosterId) {
+            ownership.delete(player.id);
+          }
+        }
+      }
       for (const player of side.adds) {
+        details.set(player.id, {
+          playerName: player.name,
+          position: player.position,
+          nflTeam: player.nflTeam,
+        });
+        if (updateOwnership) ownership.set(player.id, side.rosterId);
         acquisition.set(player.id, {
           type: transaction.type === "trade" ? "trade" : "waiver",
           rosterId: side.rosterId,
@@ -1467,40 +1526,55 @@ export function buildKeeperCandidates(
       }
     }
   }
-  const candidateFacts = finalRoster.length
-    ? finalRoster
-    : (sourceSeason.draft?.picks ?? []).map((pick) => {
-        const team = sourceSeason.teams.find(
-          (item) => item.rosterId === pick.rosterId,
-        );
-        return {
-          season: sourceSeason.year,
-          week: 0,
-          rosterId: pick.rosterId,
-          userId: team?.userId ?? String(pick.rosterId),
-          playerId: pick.playerId,
-          playerName: pick.playerName,
-          position: pick.position,
-          nflTeam: pick.nflTeam,
-          points: 0,
-          starter: false,
-        };
-      });
-  return candidateFacts
-    .map((fact) => {
-      const draft = draftByPlayer.get(fact.playerId);
-      const move = acquisition.get(fact.playerId);
+  if (archiveReady && !exactRoster.length) {
+    const seasonFacts = playerFacts.filter(
+      (fact) => fact.season === sourceSeason.year,
+    );
+    const latestWeekByRoster = new Map<number, number>();
+    for (const fact of seasonFacts) {
+      latestWeekByRoster.set(
+        fact.rosterId,
+        Math.max(latestWeekByRoster.get(fact.rosterId) ?? 0, fact.week),
+      );
+    }
+    for (const [rosterId, latestWeek] of latestWeekByRoster) {
+      const finalFacts = seasonFacts.filter(
+        (fact) => fact.rosterId === rosterId && fact.week === latestWeek,
+      );
+      const finalIds = new Set(finalFacts.map((fact) => fact.playerId));
+      for (const [playerId, ownerRosterId] of ownership) {
+        if (ownerRosterId === rosterId && !finalIds.has(playerId)) {
+          ownership.delete(playerId);
+        }
+      }
+      for (const fact of finalFacts) {
+        ownership.set(fact.playerId, rosterId);
+        details.set(fact.playerId, {
+          playerName: fact.playerName,
+          position: fact.position,
+          nflTeam: fact.nflTeam,
+        });
+      }
+    }
+  }
+  return [...ownership.entries()]
+    .map(([playerId, rosterId]) => {
+      const team = teamByRoster.get(rosterId);
+      const player = details.get(playerId);
+      if (!team || !player) return null;
+      const draft = draftByPlayer.get(playerId);
+      const move = acquisition.get(playerId);
       const acquisitionType = move?.type ?? "draft";
       const draftCost = draft
         ? Math.max(1, Math.min(10, draft.round - 1))
         : 8;
       return {
-        userId: fact.userId,
-        rosterId: fact.rosterId,
-        playerId: fact.playerId,
-        playerName: fact.playerName,
-        position: fact.position,
-        nflTeam: fact.nflTeam,
+        userId: team.userId,
+        rosterId,
+        playerId,
+        playerName: player.playerName,
+        position: player.position,
+        nflTeam: player.nflTeam,
         acquisitionType,
         costRound: acquisitionType === "waiver" ? 8 : draftCost,
         yearsRemaining: acquisitionType === "trade" ? 3 : 2,
@@ -1514,14 +1588,7 @@ export function buildKeeperCandidates(
                 : "Roster carryover",
       } satisfies KeeperCandidate;
     })
-    .filter(
-      (candidate, index, values) =>
-        values.findIndex(
-          (item) =>
-            item.userId === candidate.userId &&
-            item.playerId === candidate.playerId,
-        ) === index,
-    )
+    .filter((candidate): candidate is KeeperCandidate => Boolean(candidate))
     .sort(
       (a, b) =>
         a.rosterId - b.rosterId ||
@@ -1581,6 +1648,8 @@ export function buildLeagueChaos(input: ChaosInput): LeagueChaos {
       input.seasons,
       input.playerFacts,
       input.transactions,
+      input.rosterFacts,
+      input.archiveReady,
     ),
   };
 }

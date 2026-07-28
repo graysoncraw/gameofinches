@@ -331,3 +331,104 @@ test("keeper candidates apply draft, waiver, and trade clocks", () => {
   assert.equal(candidates[0].costRound, 1);
   assert.equal(candidates[0].yearsRemaining, 2);
 });
+
+test("keeper candidates use final rosters and apply offseason trades", () => {
+  const currentSeason: Season = {
+    ...season,
+    year: "2026",
+    status: "pre_draft",
+    champion: null,
+    runnerUp: null,
+    thirdPlace: null,
+    draft: {
+      id: "draft-2026",
+      status: "pre_draft",
+      type: "snake",
+      rounds: 19,
+      startTime: null,
+      picks: [],
+    },
+  };
+  const rosterFacts: WeeklyPlayerFact[] = [
+    {
+      season: "2025",
+      week: 0,
+      rosterId: 1,
+      userId: "a",
+      playerId: "p1",
+      playerName: "Starter One",
+      position: "QB",
+      nflTeam: "AAA",
+      points: 0,
+      starter: false,
+    },
+    {
+      season: "2025",
+      week: 0,
+      rosterId: 2,
+      userId: "b",
+      playerId: "p2",
+      playerName: "Starter Two",
+      position: "WR",
+      nflTeam: "BBB",
+      points: 0,
+      starter: false,
+    },
+  ];
+  const offseason: TransactionFeed = {
+    season: "2026",
+    counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
+    transactions: [
+      {
+        id: "offseason-trade",
+        type: "trade",
+        week: 0,
+        created: 2,
+        waiverBid: null,
+        teams: [
+          {
+            rosterId: 1,
+            teamName: "Alpha Team",
+            manager: "Alpha",
+            adds: [],
+            drops: [
+              {
+                id: "p1",
+                name: "Starter One",
+                position: "QB",
+                nflTeam: "AAA",
+              },
+            ],
+          },
+          {
+            rosterId: 2,
+            teamName: "Bravo Team",
+            manager: "Bravo",
+            adds: [
+              {
+                id: "p1",
+                name: "Starter One",
+                position: "QB",
+                nflTeam: "AAA",
+              },
+            ],
+            drops: [],
+          },
+        ],
+        draftPicks: [],
+        faabTransfers: [],
+      },
+    ],
+  };
+  const candidates = buildKeeperCandidates(
+    [currentSeason, season],
+    [],
+    { "2026": offseason },
+    rosterFacts,
+    true,
+  );
+  const traded = candidates.find((candidate) => candidate.playerId === "p1");
+  assert.equal(traded?.userId, "b");
+  assert.equal(traded?.yearsRemaining, 3);
+  assert.equal(traded?.acquisitionType, "trade");
+});

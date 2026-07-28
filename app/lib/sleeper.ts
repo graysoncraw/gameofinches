@@ -70,8 +70,8 @@ type BracketMatch = {
   r: number;
   m: number;
   p?: number;
-  t1?: number | null;
-  t2?: number | null;
+  t1?: number | Record<string, number> | null;
+  t2?: number | Record<string, number> | null;
   w?: number | null;
   l?: number | null;
 };
@@ -151,6 +151,30 @@ export type DraftPick = {
   isKeeper: boolean;
 };
 
+export type PlayoffMatchup = {
+  season: string;
+  week: number;
+  round: number;
+  matchId: number;
+  bracket: "championship" | "consolation";
+  placement: number | null;
+  stage: string;
+  winner: {
+    rosterId: number;
+    userId: string;
+    manager: string;
+    teamName: string;
+    points: number;
+  };
+  loser: {
+    rosterId: number;
+    userId: string;
+    manager: string;
+    teamName: string;
+    points: number;
+  };
+};
+
 export type Season = {
   leagueId: string;
   year: string;
@@ -159,6 +183,7 @@ export type Season = {
   champion: Team | null;
   runnerUp: Team | null;
   thirdPlace: Team | null;
+  playoffs?: PlayoffMatchup[];
   draft: {
     id: string;
     status: string;
@@ -323,6 +348,7 @@ type SeasonLoad = {
   performances: PlayerPerformance[];
   teamFacts: WeeklyTeamFact[];
   playerFacts: WeeklyPlayerFact[];
+  rosterFacts: WeeklyPlayerFact[];
 };
 
 type LeagueSnapshot = {
@@ -332,6 +358,7 @@ type LeagueSnapshot = {
   facts: {
     teams: WeeklyTeamFact[];
     players: WeeklyPlayerFact[];
+    rosters?: WeeklyPlayerFact[];
   };
 };
 
@@ -690,11 +717,19 @@ async function loadSeason(
   league: SleeperLeague,
   players: Record<string, PlayerLabel>,
 ): Promise<SeasonLoad> {
-  const [users, rosters, drafts, bracket, weeklyMatchups] = await Promise.all([
+  const [
+    users,
+    rosters,
+    drafts,
+    winnersBracket,
+    losersBracket,
+    weeklyMatchups,
+  ] = await Promise.all([
     sleeperFetch<SleeperUser[]>(`/league/${league.league_id}/users`),
     sleeperFetch<SleeperRoster[]>(`/league/${league.league_id}/rosters`),
     sleeperFetch<SleeperDraft[]>(`/league/${league.league_id}/drafts`),
     sleeperFetch<BracketMatch[]>(`/league/${league.league_id}/winners_bracket`),
+    sleeperFetch<BracketMatch[]>(`/league/${league.league_id}/losers_bracket`),
     Promise.all(
       Array.from({ length: 18 }, (_, index) =>
         sleeperFetch<SleeperMatchup[]>(
@@ -733,10 +768,10 @@ async function loadSeason(
     ? await sleeperFetch<SleeperPick[]>(`/draft/${primaryDraft.draft_id}/picks`)
     : [];
   const teamByRosterId = new Map(teams.map((team) => [team.rosterId, team]));
-  const championship = [...bracket]
+  const championship = [...winnersBracket]
     .filter((match) => match.p === 1)
     .sort((a, b) => b.r - a.r)[0];
-  const thirdPlace = [...bracket]
+  const thirdPlace = [...winnersBracket]
     .filter((match) => match.p === 3)
     .sort((a, b) => b.r - a.r)[0];
 
@@ -866,6 +901,110 @@ async function loadSeason(
       }
     }
   });
+  const rosterFacts: WeeklyPlayerFact[] = rosters.flatMap((roster) => {
+    const owner = teamByRosterId.get(roster.roster_id);
+    if (!owner) return [];
+    return (roster.players ?? []).map((playerId) => {
+      const label = playerLabel(playerId, players);
+      return {
+        season: league.season,
+        week: 0,
+        rosterId: owner.rosterId,
+        userId: owner.userId,
+        playerId,
+        playerName: label.name,
+        position: label.position,
+        nflTeam: label.nflTeam,
+        points: 0,
+        starter: false,
+      };
+    });
+  });
+  const placementLabel = (placement: number) => {
+    if (placement === 1) return "Championship";
+    if (placement === 3) return "Third-place game";
+    const suffix =
+      placement % 100 >= 11 && placement % 100 <= 13
+        ? "th"
+        : placement % 10 === 1
+          ? "st"
+          : placement % 10 === 2
+            ? "nd"
+            : placement % 10 === 3
+              ? "rd"
+              : "th";
+    return `${placement}${suffix}-place game`;
+  };
+  const maxWinnerRound = Math.max(
+    0,
+    ...winnersBracket.map((match) => match.r),
+  );
+  const playoffs: PlayoffMatchup[] = [
+    ...winnersBracket.map((match) => ({
+      match,
+      bracket: "championship" as const,
+    })),
+    ...losersBracket.map((match) => ({
+      match,
+      bracket: "consolation" as const,
+    })),
+  ]
+    .map(({ match, bracket }) => {
+      if (!match.w || !match.l) return null;
+      const winner = teamByRosterId.get(match.w);
+      const loser = teamByRosterId.get(match.l);
+      if (!winner || !loser) return null;
+      const week = (league.settings.playoff_week_start ?? 15) + match.r - 1;
+      const weekRows = weeklyMatchups[week - 1] ?? [];
+      const winnerRow = weekRows.find(
+        (row) => row.roster_id === winner.rosterId,
+      );
+      const loserRow = weekRows.find(
+        (row) => row.roster_id === loser.rosterId,
+      );
+      const stage = match.p
+        ? placementLabel(match.p)
+        : bracket === "consolation"
+          ? `Consolation Round ${match.r}`
+          : match.r === maxWinnerRound - 1
+            ? "Semifinal"
+            : match.r === maxWinnerRound - 2
+              ? "Quarterfinal"
+              : `Playoff Round ${match.r}`;
+      return {
+        season: league.season,
+        week,
+        round: match.r,
+        matchId: match.m,
+        bracket,
+        placement: match.p ?? null,
+        stage,
+        winner: {
+          rosterId: winner.rosterId,
+          userId: winner.userId,
+          manager: winner.manager,
+          teamName: winner.teamName,
+          points: Number(
+            winnerRow?.custom_points ?? winnerRow?.points ?? 0,
+          ),
+        },
+        loser: {
+          rosterId: loser.rosterId,
+          userId: loser.userId,
+          manager: loser.manager,
+          teamName: loser.teamName,
+          points: Number(loserRow?.custom_points ?? loserRow?.points ?? 0),
+        },
+      } satisfies PlayoffMatchup;
+    })
+    .filter((matchup): matchup is PlayoffMatchup => Boolean(matchup))
+    .sort(
+      (a, b) =>
+        a.round - b.round ||
+        Number(a.bracket === "consolation") -
+          Number(b.bracket === "consolation") ||
+        a.matchId - b.matchId,
+    );
 
   return {
     season: {
@@ -882,6 +1021,7 @@ async function loadSeason(
       thirdPlace: thirdPlace?.w
         ? (teamByRosterId.get(thirdPlace.w) ?? null)
         : null,
+      playoffs,
       draft: primaryDraft
         ? {
             id: primaryDraft.draft_id,
@@ -927,6 +1067,7 @@ async function loadSeason(
     performances,
     teamFacts,
     playerFacts,
+    rosterFacts,
   };
 }
 
@@ -1211,7 +1352,7 @@ async function buildSnapshot(
   const isSameLeague =
     previousCurrent?.leagueId === currentLeague.league_id &&
     previous?.schemaVersion === CHAOS_SCHEMA_VERSION &&
-    Boolean(previous?.facts);
+    Boolean(previous?.facts?.rosters);
 
   const leagueChain: SleeperLeague[] = [currentLeague];
   if (!isSameLeague) {
@@ -1286,17 +1427,25 @@ async function buildSnapshot(
     previous?.facts?.players.filter(
       (fact) => fact.season !== currentLeague.season,
     ) ?? [];
+  const previousRosterFacts =
+    previous?.facts?.rosters?.filter(
+      (fact) => fact.season !== currentLeague.season,
+    ) ?? [];
   const teamFacts = isSameLeague
     ? [...previousTeamFacts, ...refreshedCurrent.teamFacts]
     : loads.flatMap((load) => load.teamFacts);
   const playerFacts = isSameLeague
     ? [...previousPlayerFacts, ...refreshedCurrent.playerFacts]
     : loads.flatMap((load) => load.playerFacts);
+  const rosterFacts = isSameLeague
+    ? [...previousRosterFacts, ...refreshedCurrent.rosterFacts]
+    : loads.flatMap((load) => load.rosterFacts);
   const chaos = buildLeagueChaos({
     seasons,
     games,
     teamFacts,
     playerFacts,
+    rosterFacts,
     transactions,
     archiveReady: true,
   });
@@ -1324,6 +1473,7 @@ async function buildSnapshot(
     facts: {
       teams: teamFacts,
       players: playerFacts,
+      rosters: rosterFacts,
     },
   };
 }
@@ -1379,7 +1529,9 @@ async function getSnapshot(): Promise<LeagueSnapshot> {
 }
 
 function addChaosFallback(snapshot: LeagueSnapshot) {
-  if (snapshot.data.chaos) return snapshot;
+  if (snapshot.data.chaos?.schemaVersion === CHAOS_SCHEMA_VERSION) {
+    return snapshot;
+  }
   const games = snapshot.data.rivalries.flatMap((rivalry) => rivalry.games);
   const teamsBySeason = new Map(
     snapshot.data.seasons.flatMap((season) =>
@@ -1456,6 +1608,7 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
     games,
     teamFacts,
     playerFacts,
+    rosterFacts: snapshot.facts?.rosters ?? [],
     transactions: snapshot.transactions,
     archiveReady: false,
   });

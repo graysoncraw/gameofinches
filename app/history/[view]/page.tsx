@@ -7,6 +7,10 @@ const VIEWS: Record<string, { activePage: string; title: string }> = {
     activePage: "history-seasons",
     title: "Season Archive",
   },
+  playoffs: {
+    activePage: "history-playoffs",
+    title: "Playoff History",
+  },
 };
 
 export const dynamic = "force-dynamic";
