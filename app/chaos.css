@@ -355,8 +355,9 @@
 }
 
 .superlative-section {
+  background: var(--paper);
   border-top: 3px solid var(--ink);
-  padding-top: 64px;
+  padding: clamp(72px, 9vw, 132px) clamp(24px, 6vw, 92px);
 }
 
 .superlative-grid {
@@ -1331,6 +1332,7 @@
 
 @media (max-width: 720px) {
   .chaos-page,
+  .superlative-section,
   .record-book-section,
   .draft-report-section,
   .trade-tree-section,
