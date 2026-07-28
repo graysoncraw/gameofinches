@@ -192,6 +192,7 @@ export default function LeagueDashboard({
   const [draftRound, setDraftRound] = useState(1);
   const [draftSearch, setDraftSearch] = useState("");
   const [keeperYear, setKeeperYear] = useState(current.year);
+  const [openNavMenu, setOpenNavMenu] = useState<string | null>(null);
 
   const archive =
     data.seasons.find((season) => season.year === archiveYear) ??
@@ -240,6 +241,86 @@ export default function LeagueDashboard({
     minute: "2-digit",
     timeZone: "America/Chicago",
   });
+  const activeNav =
+    activePage === "profile" ? "teams" : activePage.split("-")[0];
+  const navigation: Array<{
+    key: string;
+    href: string;
+    label: string;
+    items?: Array<{ href: string; label: string; page: string }>;
+  }> = [
+    { key: "overview", href: "/", label: "Overview" },
+    { key: "teams", href: "/teams", label: "Teams" },
+    {
+      key: "history",
+      href: "/history",
+      label: "History",
+      items: [
+        { href: "/history", label: "All-time table", page: "history" },
+        {
+          href: "/history/seasons",
+          label: "Season archive",
+          page: "history-seasons",
+        },
+      ],
+    },
+    {
+      key: "records",
+      href: "/records",
+      label: "Records",
+      items: [
+        { href: "/records", label: "Money ledger", page: "records" },
+        {
+          href: "/records/rivalries",
+          label: "Rivalries",
+          page: "records-rivalries",
+        },
+        {
+          href: "/records/performances",
+          label: "Top performances",
+          page: "records-performances",
+        },
+        {
+          href: "/records/superlatives",
+          label: "Superlatives",
+          page: "records-superlatives",
+        },
+        {
+          href: "/records/book",
+          label: "Record book",
+          page: "records-book",
+        },
+        {
+          href: "/records/elo",
+          label: "Elo rankings",
+          page: "records-elo",
+        },
+      ],
+    },
+    { key: "drafts", href: "/drafts", label: "Drafts" },
+    { key: "moves", href: "/moves", label: "Moves" },
+    {
+      key: "keepers",
+      href: "/keepers",
+      label: "Keepers",
+      items: [
+        { href: "/keepers", label: "Official board", page: "keepers" },
+        {
+          href: "/keepers/rules",
+          label: "Keeper rules",
+          page: "keepers-rules",
+        },
+        {
+          href: "/keepers/lab",
+          label: "Keeper Lab",
+          page: "keepers-lab",
+        },
+      ],
+    },
+  ];
+  const openNavigation = navigation.find(
+    (item) => item.key === openNavMenu,
+  );
 
   function chooseDraftYear(year: string) {
     setDraftYear(year);
@@ -259,29 +340,76 @@ export default function LeagueDashboard({
             <small>Fantasy Football League</small>
           </span>
         </a>
-        <div className="nav-links">
-          {[
-            ["overview", "/", "Overview"],
-            ["teams", "/teams", "Teams"],
-            ["history", "/history", "History"],
-            ["records", "/records", "Records"],
-            ["drafts", "/drafts", "Drafts"],
-            ["moves", "/moves", "Moves"],
-            ["keepers", "/keepers", "Keepers"],
-          ].map(([key, href, label]) => (
-            <a
-              className={
-                (activePage === "profile" ? "teams" : activePage) === key
-                  ? "active"
-                  : ""
-              }
-              href={href}
-              key={key}
+        <div
+          className="nav-links"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setOpenNavMenu(null);
+          }}
+        >
+          {navigation.map((item) => (
+            <div
+              className={`nav-item ${item.items ? "has-dropdown" : ""}`}
+              key={item.key}
             >
-              {label}
-            </a>
+              <a
+                className={`nav-link ${activeNav === item.key ? "active" : ""}`}
+                href={item.href}
+                onClick={() => setOpenNavMenu(null)}
+              >
+                {item.label}
+              </a>
+              {item.items && (
+                <>
+                  <button
+                    aria-controls={`nav-menu-${item.key}`}
+                    aria-expanded={openNavMenu === item.key}
+                    aria-haspopup="menu"
+                    aria-label={`Show ${item.label} pages`}
+                    className="nav-dropdown-toggle"
+                    onClick={() =>
+                      setOpenNavMenu((current) =>
+                        current === item.key ? null : item.key,
+                      )
+                    }
+                    type="button"
+                  >
+                    <ChevronDown size={13} aria-hidden="true" />
+                  </button>
+                  <div
+                    className="nav-dropdown"
+                    id={`nav-menu-${item.key}`}
+                    role="menu"
+                  >
+                    {item.items.map((child) => (
+                      <a
+                        className={activePage === child.page ? "active" : ""}
+                        href={child.href}
+                        key={child.href}
+                        role="menuitem"
+                      >
+                        {child.label}
+                      </a>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           ))}
         </div>
+        {openNavigation?.items && (
+          <div className="mobile-nav-dropdown" role="menu">
+            {openNavigation.items.map((child) => (
+              <a
+                className={activePage === child.page ? "active" : ""}
+                href={child.href}
+                key={child.href}
+                role="menuitem"
+              >
+                {child.label}
+              </a>
+            ))}
+          </div>
+        )}
         <a
           className="sleeper-link"
           href={`https://sleeper.com/leagues/${current.leagueId}`}
@@ -449,7 +577,6 @@ export default function LeagueDashboard({
       )}
 
       {activePage === "history" && (
-        <>
       <section className="dark-section" id="history">
         <div className="section-heading light">
           <div>
@@ -512,7 +639,9 @@ export default function LeagueDashboard({
           </aside>
         </div>
       </section>
+      )}
 
+      {activePage === "history-seasons" && (
       <section className="content-section archive-section">
         <div className="section-heading">
           <div>
@@ -611,15 +740,25 @@ export default function LeagueDashboard({
           </div>
         </div>
       </section>
-        </>
       )}
 
       {activePage === "records" && (
-        <>
-          <LeagueRecords data={data} />
-          <LeagueSuperlatives data={data} />
-          <RecordBookExpansion data={data} />
-        </>
+        <LeagueRecords data={data} view="money" />
+      )}
+      {activePage === "records-rivalries" && (
+        <LeagueRecords data={data} view="rivalries" />
+      )}
+      {activePage === "records-performances" && (
+        <LeagueRecords data={data} view="performances" />
+      )}
+      {activePage === "records-superlatives" && (
+        <LeagueSuperlatives data={data} />
+      )}
+      {activePage === "records-book" && (
+        <RecordBookExpansion data={data} view="book" />
+      )}
+      {activePage === "records-elo" && (
+        <RecordBookExpansion data={data} view="elo" />
       )}
 
       {activePage === "drafts" && (
@@ -722,7 +861,6 @@ export default function LeagueDashboard({
       )}
 
       {activePage === "keepers" && (
-        <>
       <section className="content-section keeper-section" id="keepers">
         <div className="section-heading">
           <div>
@@ -820,7 +958,22 @@ export default function LeagueDashboard({
             </div>
           </div>
         )}
+      </section>
+      )}
 
+      {activePage === "keepers-rules" && (
+        <>
+      <section className="content-section keeper-section keeper-rules-page">
+        <div className="section-heading">
+          <div>
+            <span className="section-number">07 / KEEPER RULES</span>
+            <h2>How the keeper clock works.</h2>
+          </div>
+          <p>
+            The round-cost lineage and eligibility rules used by the official
+            board and the public Keeper Lab.
+          </p>
+        </div>
         <div className="keeper-rules">
           <div><span>01</span><strong>Costs move up one round each year</strong></div>
           <div><span>02</span><strong>Waiver additions start at Round 8</strong></div>
@@ -828,7 +981,6 @@ export default function LeagueDashboard({
           <div><span>04</span><strong>Three-year max; trades reset the clock</strong></div>
         </div>
       </section>
-
       <section className="rules-strip">
         <div>
           <span>LEAGUE DNA</span>
@@ -856,8 +1008,11 @@ export default function LeagueDashboard({
           </div>
         </dl>
       </section>
-      <KeeperWarRoom data={data} keepers={keepers} />
         </>
+      )}
+
+      {activePage === "keepers-lab" && (
+      <KeeperWarRoom data={data} keepers={keepers} />
       )}
 
       {activePage === "profile" &&

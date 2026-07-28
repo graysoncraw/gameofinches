@@ -314,19 +314,33 @@ export function ChaosHub({
   );
 }
 
-export function RecordBookExpansion({ data }: { data: LeagueData }) {
+export function RecordBookExpansion({
+  data,
+  view,
+}: {
+  data: LeagueData;
+  view: "book" | "elo";
+}) {
   return (
     <section className="record-book-section">
       <div className="section-heading">
         <div>
-          <span className="section-number">THE RECORD BOOK</span>
-          <h2>Some marks deserve a warning label.</h2>
+          <span className="section-number">
+            {view === "book" ? "THE RECORD BOOK" : "K=24 · STARTING AT 1500"}
+          </span>
+          <h2>
+            {view === "book"
+              ? "Some marks deserve a warning label."
+              : "The all-time Elo ladder."}
+          </h2>
         </div>
         <p>
-          Team scores, margins, heartbreak, lineup efficiency, and postseason
-          explosions—zero and unplayed matchups excluded.
+          {view === "book"
+            ? "Team scores, margins, heartbreak, lineup efficiency, and postseason explosions—zero and unplayed matchups excluded."
+            : "Every matchup counts equally, with no home advantage and a transparent K-factor of 24."}
         </p>
       </div>
+      {view === "book" && (
       <div className="record-book-grid">
         {data.chaos.records.map((record, index) => (
           <article key={record.id}>
@@ -346,6 +360,8 @@ export function RecordBookExpansion({ data }: { data: LeagueData }) {
           </article>
         ))}
       </div>
+      )}
+      {view === "elo" && (
       <div className="elo-history">
         <div className="chaos-panel__title">
           <Gauge size={20} aria-hidden="true" />
@@ -372,6 +388,7 @@ export function RecordBookExpansion({ data }: { data: LeagueData }) {
           </a>
         ))}
       </div>
+      )}
     </section>
   );
 }

@@ -20,7 +20,13 @@ function points(value: number) {
   }).format(value);
 }
 
-export default function LeagueRecords({ data }: { data: LeagueData }) {
+export default function LeagueRecords({
+  data,
+  view,
+}: {
+  data: LeagueData;
+  view: "money" | "rivalries" | "performances";
+}) {
   const managers = useMemo(() => {
     const values = new Map<
       string,
@@ -67,6 +73,26 @@ export default function LeagueRecords({ data }: { data: LeagueData }) {
   const pending = data.finances.seasons.find(
     (season) => season.status === "pending",
   );
+  const pageCopy = {
+    money: {
+      number: "03 / LEAGUE LEDGER",
+      title: "Follow the money.",
+      description:
+        "Every settled buy-in, prize, and all-time net result—with the current purse shown separately until the season is complete.",
+    },
+    rivalries: {
+      number: "03 / HEAD TO HEAD",
+      title: "Choose your enemies.",
+      description:
+        "Every regular-season, playoff, and consolation meeting between any two Game of Inches franchises.",
+    },
+    performances: {
+      number: "03 / SUNDAY DETONATIONS",
+      title: "The biggest individual games.",
+      description:
+        "The ten highest starter scores in league history, including the owner, opponent, season, week, and postseason stage.",
+    },
+  }[view];
 
   function chooseA(value: string) {
     setManagerA(value);
@@ -90,15 +116,13 @@ export default function LeagueRecords({ data }: { data: LeagueData }) {
     <section className="records-section" id="records">
       <div className="section-heading">
         <div>
-          <span className="section-number">03 / DEEP CUTS</span>
-          <h2>Money, grudges & explosions.</h2>
+          <span className="section-number">{pageCopy.number}</span>
+          <h2>{pageCopy.title}</h2>
         </div>
-        <p>
-          The receipts behind the standings: settled cash, every head-to-head,
-          and the biggest starter performances in league history.
-        </p>
+        <p>{pageCopy.description}</p>
       </div>
 
+      {view === "money" && (
       <div className="money-panel">
         <div className="records-title">
           <div>
@@ -166,7 +190,9 @@ export default function LeagueRecords({ data }: { data: LeagueData }) {
           )}
         </div>
       </div>
+      )}
 
+      {view === "rivalries" && (
       <div className="rivalry-panel">
         <div className="records-title">
           <div>
@@ -250,7 +276,9 @@ export default function LeagueRecords({ data }: { data: LeagueData }) {
           <div className="rivalry-empty">These two have not met yet.</div>
         )}
       </div>
+      )}
 
+      {view === "performances" && (
       <div className="performances-panel">
         <div className="records-title">
           <div>
@@ -291,6 +319,7 @@ export default function LeagueRecords({ data }: { data: LeagueData }) {
           ))}
         </div>
       </div>
+      )}
     </section>
   );
 }

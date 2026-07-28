@@ -26,22 +26,25 @@ function dataForPage(
   profileUserId?: string,
 ): LeagueData {
   const chaos = data.chaos;
+  const recordBookPage = activePage === "records-book";
+  const eloPage = activePage === "records-elo";
   return {
     ...data,
     chaos: {
       ...chaos,
       recaps: [],
       records:
-        activePage === "records" || activePage === "profile"
+        recordBookPage || activePage === "profile"
           ? chaos.records
           : [],
       elo:
-        activePage === "records" || activePage === "profile"
+        eloPage || activePage === "profile"
           ? chaos.elo
           : { standings: [], timeline: [] },
       drafts: [],
       trades: [],
-      superlatives: activePage === "records" ? chaos.superlatives : [],
+      superlatives:
+        activePage === "records-superlatives" ? chaos.superlatives : [],
       franchises:
         activePage === "profile"
           ? chaos.franchises.filter(
@@ -49,7 +52,7 @@ function dataForPage(
             ).map((franchise) => ({ ...franchise, draftGrades: [] }))
           : [],
       keeperCandidates:
-        activePage === "keepers" ? chaos.keeperCandidates : [],
+        activePage === "keepers-lab" ? chaos.keeperCandidates : [],
     },
   };
 }
