@@ -11,6 +11,8 @@ import {
   type WeeklyPlayerFact,
   type WeeklyTeamFact,
 } from "../app/lib/chaos.ts";
+import { projectKeeperCandidate } from "../app/lib/keeper-candidates.ts";
+import type { KeeperRecord } from "../app/lib/keepers.ts";
 import type {
   RivalryGame,
   Season,
@@ -431,4 +433,99 @@ test("keeper candidates use final rosters and apply offseason trades", () => {
   assert.equal(traded?.userId, "b");
   assert.equal(traded?.yearsRemaining, 3);
   assert.equal(traded?.acquisitionType, "trade");
+  assert.equal(traded?.tradeTiming, "offseason");
+});
+
+test("keeper candidates give in-season trades two keeper years", () => {
+  const inSeason: TransactionFeed = {
+    season: "2025",
+    counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
+    transactions: [
+      {
+        id: "in-season-trade",
+        type: "trade",
+        week: 8,
+        created: 1,
+        waiverBid: null,
+        teams: [
+          {
+            rosterId: 1,
+            teamName: "Alpha Team",
+            manager: "Alpha",
+            adds: [],
+            drops: [],
+          },
+          {
+            rosterId: 2,
+            teamName: "Bravo Team",
+            manager: "Bravo",
+            adds: [
+              {
+                id: "p1",
+                name: "Starter One",
+                position: "QB",
+                nflTeam: "AAA",
+              },
+            ],
+            drops: [],
+          },
+        ],
+        draftPicks: [],
+        faabTransfers: [],
+      },
+    ],
+  };
+  const candidates = buildKeeperCandidates(
+    [season],
+    [],
+    { "2025": inSeason },
+  );
+  const traded = candidates.find((candidate) => candidate.playerId === "p1");
+  assert.equal(traded?.yearsRemaining, 2);
+  assert.equal(traded?.tradeTiming, "in-season");
+  assert.match(traded?.source ?? "", /In-season trade/);
+});
+
+test("keeper history keeps trade cost lineage but applies the correct timer", () => {
+  const previous: KeeperRecord = {
+    season: "2025",
+    rosterId: 1,
+    slot: 1,
+    managerName: "Alpha",
+    teamName: "Alpha Team",
+    playerName: "Starter One",
+    position: "QB",
+    nflTeam: "AAA",
+    costRound: 6,
+    yearsRemaining: 1,
+    acquisitionType: "draft",
+    notes: "",
+  };
+  const baseCandidate = {
+    userId: "a",
+    rosterId: 1,
+    playerId: "p1",
+    playerName: "Starter One",
+    position: "QB",
+    nflTeam: "AAA",
+    acquisitionType: "trade" as const,
+    costRound: 1,
+    yearsRemaining: 2,
+    source: "",
+  };
+  const inSeason = projectKeeperCandidate(
+    { ...baseCandidate, tradeTiming: "in-season" },
+    [previous],
+    "2025",
+  );
+  const offseason = projectKeeperCandidate(
+    { ...baseCandidate, tradeTiming: "offseason" },
+    [previous],
+    "2025",
+  );
+
+  assert.equal(inSeason.costRound, 5);
+  assert.equal(inSeason.yearsRemaining, 2);
+  assert.equal(offseason.costRound, 5);
+  assert.equal(offseason.yearsRemaining, 3);
 });

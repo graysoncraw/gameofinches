@@ -22,6 +22,11 @@ export default async function AdminPage() {
         league.seasons.map((season) => [season.year, season.teams]),
       )}
       initialKeepers={keepers}
+      keeperCandidates={league.chaos.keeperCandidates}
+      sourceSeason={
+        league.seasons.find((season) => season.status === "complete")?.year ??
+        ""
+      }
     />
   );
 }

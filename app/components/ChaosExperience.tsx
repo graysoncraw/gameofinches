@@ -30,6 +30,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { KeeperRecord } from "../lib/keepers";
 import type { FranchiseProfile, KeeperCandidate } from "../lib/chaos";
+import { projectKeeperCandidate } from "../lib/keeper-candidates";
 import type { LeagueData } from "../lib/sleeper";
 
 function number(value: number) {
@@ -608,39 +609,6 @@ export function TradeTrees({ data }: { data: LeagueData }) {
   );
 }
 
-function projectedCandidate(
-  candidate: KeeperCandidate,
-  keepers: KeeperRecord[],
-  sourceSeason: string,
-) {
-  const sameRoster = keepers.find(
-    (keeper) =>
-      keeper.season === sourceSeason &&
-      keeper.rosterId === candidate.rosterId &&
-      keeper.playerName.toLowerCase() === candidate.playerName.toLowerCase(),
-  );
-  const previous =
-    sameRoster ??
-    keepers.find(
-      (keeper) =>
-        keeper.season === sourceSeason &&
-        keeper.playerName.toLowerCase() === candidate.playerName.toLowerCase(),
-    );
-  if (!previous) return candidate;
-  const traded = candidate.acquisitionType === "trade";
-  return {
-    ...candidate,
-    costRound: Math.max(1, previous.costRound - 1),
-    yearsRemaining: traded
-      ? 3
-      : Math.max(0, previous.yearsRemaining - 1),
-    acquisitionType: traded ? "trade" : previous.acquisitionType,
-    source: traded
-      ? "Offseason trade · timer reset; keeper cost lineage retained"
-      : `Returning keeper · ${previous.yearsRemaining} years previously`,
-  };
-}
-
 export function KeeperWarRoom({
   data,
   keepers,
@@ -661,7 +629,9 @@ export function KeeperWarRoom({
     () =>
       data.chaos.keeperCandidates
         .filter((candidate) => candidate.userId === team?.userId)
-        .map((candidate) => projectedCandidate(candidate, keepers, sourceSeason))
+        .map((candidate) =>
+          projectKeeperCandidate(candidate, keepers, sourceSeason),
+        )
         .filter((candidate) =>
           `${candidate.playerName} ${candidate.position} ${candidate.nflTeam}`
             .toLowerCase()

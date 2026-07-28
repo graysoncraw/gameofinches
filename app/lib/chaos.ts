@@ -7,7 +7,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 3;
+export const CHAOS_SCHEMA_VERSION = 4;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -215,6 +215,7 @@ export type KeeperCandidate = {
   position: string;
   nflTeam: string;
   acquisitionType: "draft" | "waiver" | "trade";
+  tradeTiming: "offseason" | "in-season" | null;
   costRound: number;
   yearsRemaining: number;
   source: string;
@@ -1476,7 +1477,11 @@ export function buildKeeperCandidates(
   const ownership = new Map<string, number>();
   const acquisition = new Map<
     string,
-    { type: KeeperCandidate["acquisitionType"]; rosterId: number }
+    {
+      type: KeeperCandidate["acquisitionType"];
+      rosterId: number;
+      tradeTiming: KeeperCandidate["tradeTiming"];
+    }
   >();
   const exactRoster = rosterFacts.filter(
     (fact) => fact.season === sourceSeason.year,
@@ -1522,6 +1527,12 @@ export function buildKeeperCandidates(
         acquisition.set(player.id, {
           type: transaction.type === "trade" ? "trade" : "waiver",
           rosterId: side.rosterId,
+          tradeTiming:
+            transaction.type === "trade"
+              ? Number(season) > Number(sourceSeason.year)
+                ? "offseason"
+                : "in-season"
+              : null,
         });
       }
     }
@@ -1565,6 +1576,7 @@ export function buildKeeperCandidates(
       const draft = draftByPlayer.get(playerId);
       const move = acquisition.get(playerId);
       const acquisitionType = move?.type ?? "draft";
+      const tradeTiming = move?.tradeTiming ?? null;
       const draftCost = draft
         ? Math.max(1, Math.min(10, draft.round - 1))
         : 8;
@@ -1576,11 +1588,14 @@ export function buildKeeperCandidates(
         position: player.position,
         nflTeam: player.nflTeam,
         acquisitionType,
+        tradeTiming,
         costRound: acquisitionType === "waiver" ? 8 : draftCost,
-        yearsRemaining: acquisitionType === "trade" ? 3 : 2,
+        yearsRemaining: tradeTiming === "offseason" ? 3 : 2,
         source:
-          acquisitionType === "trade"
-            ? "Trade acquisition · timer reset"
+          tradeTiming === "offseason"
+            ? "Offseason trade · timer reset to 3 years"
+            : tradeTiming === "in-season"
+              ? "In-season trade · 2 years left"
             : acquisitionType === "waiver"
               ? "Waiver / free agent · Round 8"
               : draft

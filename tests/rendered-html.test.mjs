@@ -64,6 +64,9 @@ test("includes the requested league records and keeper labels", async () => {
   assert.match(dashboard, /Year 1 · 3 left/);
   assert.match(portal, /Year 1 · offseason trade · 3 years left/);
   assert.match(portal, /Year 3 · final year/);
+  assert.match(portal, /Eligible player/);
+  assert.match(portal, /keeperCandidates/);
+  assert.doesNotMatch(portal, /placeholder="e\.g\. Ja'Marr Chase"/);
 });
 
 test("ships league records, superlatives, profiles, and the public Keeper Lab", async () => {

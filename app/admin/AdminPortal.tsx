@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { KeeperCandidate } from "../lib/chaos";
+import { projectKeeperCandidate } from "../lib/keeper-candidates";
 import type { KeeperRecord } from "../lib/keepers";
 import type { Team } from "../lib/sleeper";
 
@@ -59,11 +61,15 @@ export default function AdminPortal({
   seasons,
   teamsBySeason,
   initialKeepers,
+  keeperCandidates,
+  sourceSeason,
 }: {
   currentSeason: string;
   seasons: string[];
   teamsBySeason: Record<string, Team[]>;
   initialKeepers: KeeperRecord[];
+  keeperCandidates: KeeperCandidate[];
+  sourceSeason: string;
 }) {
   const editableSeasons = useMemo(
     () => [...new Set([currentSeason, ...seasons])].sort((a, b) => Number(b) - Number(a)),
@@ -109,6 +115,19 @@ export default function AdminPortal({
       ...current,
       [key]: { ...draftFor(rosterId, slot), ...patch },
     }));
+  }
+
+  function candidatesFor(team: Team) {
+    if (season !== currentSeason) return [];
+    return keeperCandidates
+      .filter(
+        (candidate) =>
+          candidate.userId === team.userId ||
+          candidate.rosterId === team.rosterId,
+      )
+      .map((candidate) =>
+        projectKeeperCandidate(candidate, keepers, sourceSeason),
+      );
   }
 
   async function save(team: Team, slot: number) {
@@ -281,6 +300,25 @@ export default function AdminPortal({
               <div className="admin-slots">
                 {[1, 2].map((slot) => {
                   const draft = draftFor(team.rosterId, slot);
+                  const otherKeeper = draftFor(
+                    team.rosterId,
+                    slot === 1 ? 2 : 1,
+                  ).playerName.toLowerCase();
+                  const candidates = candidatesFor(team).filter(
+                    (candidate) =>
+                      candidate.playerName.toLowerCase() !== otherKeeper ||
+                      candidate.playerName.toLowerCase() ===
+                        draft.playerName.toLowerCase(),
+                  );
+                  const selectedCandidate = candidates.find(
+                    (candidate) =>
+                      candidate.playerName.toLowerCase() ===
+                      draft.playerName.toLowerCase(),
+                  );
+                  const savedOnly =
+                    draft.playerName && !selectedCandidate
+                      ? draft.playerName
+                      : null;
                   const key = draftKey(season, team.rosterId, slot);
                   const isSaving = savingKey === key;
                   return (
@@ -298,43 +336,72 @@ export default function AdminPortal({
                       </div>
                       <div className="admin-fields">
                         <label className="field-wide">
-                          <span>Player name</span>
-                          <input
+                          <span>Eligible player</span>
+                          <select
                             value={draft.playerName}
-                            onChange={(event) =>
-                              updateDraft(team.rosterId, slot, {
-                                playerName: event.target.value,
-                              })
-                            }
-                            placeholder="e.g. Ja'Marr Chase"
-                          />
+                            onChange={(event) => {
+                              const candidate = candidates.find(
+                                (item) =>
+                                  item.playerName === event.target.value,
+                              );
+                              updateDraft(
+                                team.rosterId,
+                                slot,
+                                candidate
+                                  ? {
+                                      playerName: candidate.playerName,
+                                      position: candidate.position,
+                                      nflTeam: candidate.nflTeam,
+                                      costRound: candidate.costRound,
+                                      yearsRemaining:
+                                        candidate.yearsRemaining,
+                                      acquisitionType:
+                                        candidate.acquisitionType,
+                                      notes: candidate.source,
+                                    }
+                                  : emptyDraft(),
+                              );
+                            }}
+                          >
+                            <option value="">Select a roster candidate</option>
+                            {savedOnly && (
+                              <option value={savedOnly}>
+                                {savedOnly} · saved selection
+                              </option>
+                            )}
+                            {candidates.map((candidate) => (
+                              <option
+                                key={candidate.playerId}
+                                value={candidate.playerName}
+                              >
+                                {candidate.playerName} · {candidate.position} ·
+                                R{candidate.costRound}
+                              </option>
+                            ))}
+                          </select>
                         </label>
-                        <label>
-                          <span>Position</span>
-                          <input
-                            value={draft.position}
-                            onChange={(event) =>
-                              updateDraft(team.rosterId, slot, {
-                                position: event.target.value,
-                              })
-                            }
-                            placeholder="WR"
-                            maxLength={5}
-                          />
-                        </label>
-                        <label>
-                          <span>NFL team</span>
-                          <input
-                            value={draft.nflTeam}
-                            onChange={(event) =>
-                              updateDraft(team.rosterId, slot, {
-                                nflTeam: event.target.value,
-                              })
-                            }
-                            placeholder="CIN"
-                            maxLength={4}
-                          />
-                        </label>
+                        {selectedCandidate ? (
+                          <div className="admin-candidate-summary field-wide">
+                            <span>
+                              {selectedCandidate.position} ·{" "}
+                              {selectedCandidate.nflTeam || "FA"}
+                            </span>
+                            <strong>
+                              Recommended R{selectedCandidate.costRound} ·{" "}
+                              {selectedCandidate.yearsRemaining}{" "}
+                              {selectedCandidate.yearsRemaining === 1
+                                ? "year"
+                                : "years"}
+                            </strong>
+                            <small>{selectedCandidate.source}</small>
+                          </div>
+                        ) : (
+                          <p className="admin-candidate-empty field-wide">
+                            {season === currentSeason
+                              ? "Choose from this franchise’s synced roster and acquisition history."
+                              : "Historical seasons preserve saved selections; roster candidates are available for the current season."}
+                          </p>
+                        )}
                         <label>
                           <span>2026 cost</span>
                           <select
@@ -432,7 +499,8 @@ export default function AdminPortal({
             <li>Waiver pickups begin at an 8th-round cost.</li>
             <li>Players drafted after Round 10 begin at Round 10.</li>
             <li>Two keepers with the same cost occupy consecutive rounds.</li>
-            <li>Maximum three keeper seasons; a trade resets the timer.</li>
+            <li>Offseason trades reset the timer to three years.</li>
+            <li>In-season trades receive two keeper years.</li>
           </ol>
           <p>
             The portal stores the official ruling. It does not write to the

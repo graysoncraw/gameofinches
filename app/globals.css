@@ -2207,6 +2207,41 @@ td {
   grid-column: 1 / -1;
 }
 
+.admin-candidate-summary {
+  align-items: center;
+  background: color-mix(in srgb, var(--orange) 8%, var(--paper));
+  border-left: 3px solid var(--orange);
+  display: grid;
+  gap: 3px;
+  grid-template-columns: auto 1fr;
+  padding: 10px 12px;
+}
+
+.admin-candidate-summary span,
+.admin-candidate-summary strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.admin-candidate-summary strong {
+  justify-self: end;
+}
+
+.admin-candidate-summary small {
+  color: var(--muted);
+  grid-column: 1 / -1;
+}
+
+.admin-candidate-empty {
+  background: var(--paper);
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
 .admin-save {
   align-items: center;
   background: var(--orange);
