@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-html-link-for-pages -- vinext duplicates React when next/link is used in this client tree. */
+
 import {
   ArrowUpRight,
   CalendarDays,
@@ -162,9 +164,11 @@ function DraftCard({ pick }: { pick: DraftPick }) {
 export default function LeagueDashboard({
   data,
   keepers,
+  activePage = "overview",
 }: {
   data: LeagueData;
   keepers: KeeperRecord[];
+  activePage?: string;
 }) {
   const current = data.seasons[0];
   const completedSeasons = data.seasons.filter(
@@ -238,7 +242,7 @@ export default function LeagueDashboard({
   return (
     <main>
       <nav className="topbar" aria-label="Primary navigation">
-        <a className="brand" href="#top" aria-label="Game of Inches home">
+        <a className="brand" href="/" aria-label="Game of Inches home">
           <span className="brand-mark">
             G<span>/</span>I
           </span>
@@ -248,12 +252,23 @@ export default function LeagueDashboard({
           </span>
         </a>
         <div className="nav-links">
-          <a href="#franchises">Teams</a>
-          <a href="#history">History</a>
-          <a href="#records">Records</a>
-          <a href="#drafts">Drafts</a>
-          <a href="#transactions">Moves</a>
-          <a href="#keepers">Keepers</a>
+          {[
+            ["overview", "/", "Overview"],
+            ["teams", "/teams", "Teams"],
+            ["history", "/history", "History"],
+            ["records", "/records", "Records"],
+            ["drafts", "/drafts", "Drafts"],
+            ["moves", "/moves", "Moves"],
+            ["keepers", "/keepers", "Keepers"],
+          ].map(([key, href, label]) => (
+            <a
+              className={activePage === key ? "active" : ""}
+              href={href}
+              key={key}
+            >
+              {label}
+            </a>
+          ))}
         </div>
         <a
           className="sleeper-link"
@@ -265,6 +280,8 @@ export default function LeagueDashboard({
         </a>
       </nav>
 
+      {activePage === "overview" && (
+        <>
       <section className="hero" id="top">
         <div className="yard-lines" aria-hidden="true" />
         <div className="hero-copy">
@@ -284,10 +301,10 @@ export default function LeagueDashboard({
             hard-earned point in one living league archive.
           </p>
           <div className="hero-actions">
-            <a className="button button--primary" href="#history">
+            <a className="button button--primary" href="/history">
               Explore the archive <History size={17} aria-hidden="true" />
             </a>
-            <a className="button button--ghost" href="#drafts">
+            <a className="button button--ghost" href="/drafts">
               Enter the draft room
             </a>
           </div>
@@ -365,7 +382,10 @@ export default function LeagueDashboard({
           </strong>
         </div>
       </section>
+        </>
+      )}
 
+      {activePage === "teams" && (
       <section className="content-section" id="franchises">
         <div className="section-heading">
           <div>
@@ -407,7 +427,10 @@ export default function LeagueDashboard({
           ))}
         </div>
       </section>
+      )}
 
+      {activePage === "history" && (
+        <>
       <section className="dark-section" id="history">
         <div className="section-heading light">
           <div>
@@ -470,8 +493,6 @@ export default function LeagueDashboard({
           </aside>
         </div>
       </section>
-
-      <LeagueRecords data={data} />
 
       <section className="content-section archive-section">
         <div className="section-heading">
@@ -571,7 +592,12 @@ export default function LeagueDashboard({
           </div>
         </div>
       </section>
+        </>
+      )}
 
+      {activePage === "records" && <LeagueRecords data={data} />}
+
+      {activePage === "drafts" && (
       <section className="draft-section" id="drafts">
         <div className="section-heading">
           <div>
@@ -657,12 +683,17 @@ export default function LeagueDashboard({
           )}
         </div>
       </section>
+      )}
 
+      {activePage === "moves" && (
       <TransactionHistory
         seasons={data.seasons.map((season) => season.year)}
         defaultSeason={latestCompleted?.year ?? current.year}
       />
+      )}
 
+      {activePage === "keepers" && (
+        <>
       <section className="content-section keeper-section" id="keepers">
         <div className="section-heading">
           <div>
@@ -796,9 +827,11 @@ export default function LeagueDashboard({
           </div>
         </dl>
       </section>
+        </>
+      )}
 
       <footer>
-        <div className="brand footer-brand">
+        <a className="brand footer-brand" href="/">
           <span className="brand-mark">
             G<span>/</span>I
           </span>
@@ -806,14 +839,12 @@ export default function LeagueDashboard({
             Game of Inches
             <small>Fantasy Football League</small>
           </span>
-        </div>
+        </a>
         <p>
           League data powered by Sleeper. Built for the ten who know that every
           decimal matters.
         </p>
-        <a
-          href="/admin"
-        >
+        <a href="/admin">
           Commissioner desk <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       </footer>

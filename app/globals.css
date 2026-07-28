@@ -149,8 +149,13 @@ main {
 }
 
 .nav-links a:hover::after,
-.nav-links a:focus-visible::after {
+.nav-links a:focus-visible::after,
+.nav-links a.active::after {
   transform: scaleX(1);
+}
+
+.nav-links a.active {
+  color: var(--orange);
 }
 
 .sleeper-link {
@@ -2817,11 +2822,34 @@ footer > a {
 
 @media (max-width: 1120px) {
   .topbar {
+    grid-template-rows: 70px 48px;
     grid-template-columns: 1fr auto;
+    height: auto;
+    padding-inline: 24px;
   }
 
   .nav-links {
+    align-self: stretch;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 28px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: start;
+    margin-inline: -24px;
+    overflow-x: auto;
+    padding: 0 24px;
+    scrollbar-width: none;
+  }
+
+  .nav-links::-webkit-scrollbar {
     display: none;
+  }
+
+  .nav-links a {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
   }
 
   .hero {
@@ -2861,7 +2889,11 @@ footer > a {
 
 @media (max-width: 850px) {
   .topbar {
-    height: 70px;
+    padding-inline: 20px;
+  }
+
+  .nav-links {
+    margin-inline: -20px;
     padding-inline: 20px;
   }
 

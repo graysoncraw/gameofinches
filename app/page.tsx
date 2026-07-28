@@ -1,4 +1,5 @@
-import Link from "next/link";
+/* eslint-disable @next/next/no-html-link-for-pages -- keep page links compatible with the vinext runtime. */
+
 import LeagueDashboard from "./components/LeagueDashboard";
 import { getKeeperRecords } from "./lib/keepers";
 import { getLeagueData } from "./lib/sleeper";
@@ -18,10 +19,20 @@ async function loadHomeData() {
   }
 }
 
-export default async function Home() {
+export default async function Home({
+  activePage = "overview",
+}: {
+  activePage?: string;
+} = {}) {
   const result = await loadHomeData();
   if (result) {
-    return <LeagueDashboard data={result.data} keepers={result.keepers} />;
+    return (
+      <LeagueDashboard
+        activePage={activePage}
+        data={result.data}
+        keepers={result.keepers}
+      />
+    );
   }
 
   return (
@@ -33,7 +44,7 @@ export default async function Home() {
           Sleeper didn’t answer this request. Refresh in a moment and the league
           archive should be right back.
         </p>
-        <Link href="/">Try again</Link>
+        <a href="/">Try again</a>
       </div>
     </main>
   );
