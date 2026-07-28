@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { FIRST_ROUND_CONFLICT_MESSAGE } from "./keeper-candidates";
 import { HISTORICAL_KEEPERS, type KeeperSeed } from "./keeper-seed";
 
 export type KeeperRecord = KeeperSeed & {
@@ -123,6 +124,18 @@ export async function saveKeeper(
   const db = getD1();
   if (!db) throw new Error("Keeper storage is unavailable.");
   await ensureKeeperSchema(db);
+
+  if (keeper.costRound === 1) {
+    const conflict = await db
+      .prepare(
+        `SELECT id FROM keepers
+         WHERE season = ? AND roster_id = ? AND slot != ? AND cost_round = 1
+         LIMIT 1`,
+      )
+      .bind(keeper.season, keeper.rosterId, keeper.slot)
+      .first();
+    if (conflict) throw new Error(FIRST_ROUND_CONFLICT_MESSAGE);
+  }
 
   const updatedAt = new Date().toISOString();
   await db

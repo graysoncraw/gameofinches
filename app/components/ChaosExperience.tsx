@@ -30,7 +30,11 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { KeeperRecord } from "../lib/keepers";
 import type { FranchiseProfile, KeeperCandidate } from "../lib/chaos";
-import { projectKeeperCandidate } from "../lib/keeper-candidates";
+import {
+  FIRST_ROUND_CONFLICT_MESSAGE,
+  hasFirstRoundKeeperConflict,
+  projectKeeperCandidate,
+} from "../lib/keeper-candidates";
 import type { LeagueData } from "../lib/sleeper";
 
 function number(value: number) {
@@ -648,7 +652,32 @@ export function KeeperWarRoom({
     return () => window.cancelAnimationFrame(frame);
   }, [current.year, teams]);
 
+  const chosen = selected
+    .map((id) => candidates.find((candidate) => candidate.playerId === id))
+    .filter((candidate): candidate is KeeperCandidate => Boolean(candidate));
+  const collision =
+    chosen.length === 2 && chosen[0].costRound === chosen[1].costRound;
+  const invalid = hasFirstRoundKeeperConflict(
+    chosen[0]?.costRound,
+    chosen[1]?.costRound,
+  );
+  const firstRoundSelected = chosen.some(
+    (candidate) => candidate.costRound === 1,
+  );
+
   function toggle(playerId: string) {
+    const candidate = candidates.find((item) => item.playerId === playerId);
+    if (
+      candidate &&
+      !selected.includes(playerId) &&
+      hasFirstRoundKeeperConflict(
+        candidate.costRound,
+        firstRoundSelected ? 1 : undefined,
+      )
+    ) {
+      return;
+    }
+
     setSelected((currentSelected) => {
       const next = currentSelected.includes(playerId)
         ? currentSelected.filter((item) => item !== playerId)
@@ -663,12 +692,6 @@ export function KeeperWarRoom({
     });
   }
 
-  const chosen = selected
-    .map((id) => candidates.find((candidate) => candidate.playerId === id))
-    .filter((candidate): candidate is KeeperCandidate => Boolean(candidate));
-  const collision =
-    chosen.length === 2 && chosen[0].costRound === chosen[1].costRound;
-  const invalid = collision && chosen[0].costRound === 1;
   const roundFor = (index: number) => {
     if (!collision) return chosen[index]?.costRound;
     const laterIndex = secondGetsLaterRound ? 1 : 0;
@@ -747,31 +770,49 @@ export function KeeperWarRoom({
             />
           </label>
           <div className="keeper-candidate-list">
-            {candidates.map((candidate) => (
-              <button
-                className={selected.includes(candidate.playerId) ? "selected" : ""}
-                type="button"
-                onClick={() => toggle(candidate.playerId)}
-                key={candidate.playerId}
-                disabled={candidate.yearsRemaining <= 0}
-              >
-                <div>
-                  <strong>{candidate.playerName}</strong>
-                  <span>
-                    {candidate.position} · {candidate.nflTeam || "FA"}
-                  </span>
-                  <small>{candidate.source}</small>
-                </div>
-                <div>
-                  <span>R{candidate.costRound}</span>
-                  <b>
-                    {candidate.yearsRemaining > 0
-                      ? `${candidate.yearsRemaining} yr`
-                      : "Expired"}
-                  </b>
-                </div>
-              </button>
-            ))}
+            {candidates.map((candidate) => {
+              const selectedCandidate = selected.includes(candidate.playerId);
+              const firstRoundBlocked =
+                !selectedCandidate &&
+                firstRoundSelected &&
+                candidate.costRound === 1;
+              return (
+                <button
+                  className={selectedCandidate ? "selected" : ""}
+                  type="button"
+                  onClick={() => toggle(candidate.playerId)}
+                  key={candidate.playerId}
+                  disabled={
+                    candidate.yearsRemaining <= 0 || firstRoundBlocked
+                  }
+                  title={
+                    firstRoundBlocked
+                      ? FIRST_ROUND_CONFLICT_MESSAGE
+                      : undefined
+                  }
+                >
+                  <div>
+                    <strong>{candidate.playerName}</strong>
+                    <span>
+                      {candidate.position} · {candidate.nflTeam || "FA"}
+                    </span>
+                    <small>
+                      {firstRoundBlocked
+                        ? "Round 1 keeper slot already filled"
+                        : candidate.source}
+                    </small>
+                  </div>
+                  <div>
+                    <span>R{candidate.costRound}</span>
+                    <b>
+                      {candidate.yearsRemaining > 0
+                        ? `${candidate.yearsRemaining} yr`
+                        : "Expired"}
+                    </b>
+                  </div>
+                </button>
+              );
+            })}
             {!candidates.length && (
               <div className="keeper-lab-empty">
                 {data.chaos.archiveReady
@@ -831,7 +872,7 @@ export function KeeperWarRoom({
           {invalid && (
             <div className="round-collision invalid">
               <Skull size={16} aria-hidden="true" />
-              Two Round 1 costs cannot coexist. Choose one.
+              {FIRST_ROUND_CONFLICT_MESSAGE}
             </div>
           )}
           <a href="/admin">

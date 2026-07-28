@@ -44,11 +44,12 @@ test("protects commissioner writes with the shared password session", async () =
 });
 
 test("includes the requested league records and keeper labels", async () => {
-  const [sleeper, records, dashboard, portal] = await Promise.all([
+  const [sleeper, records, dashboard, portal, keeperStorage] = await Promise.all([
     file("app/lib/sleeper.ts"),
     file("app/components/LeagueRecords.tsx"),
     file("app/components/LeagueDashboard.tsx"),
     file("app/admin/AdminPortal.tsx"),
+    file("app/lib/keepers.ts"),
   ]);
 
   assert.match(sleeper, /"2023": \{ buyIn: 10, first: 100/);
@@ -66,6 +67,9 @@ test("includes the requested league records and keeper labels", async () => {
   assert.match(portal, /Year 3 · final year/);
   assert.match(portal, /Eligible player/);
   assert.match(portal, /keeperCandidates/);
+  assert.match(portal, /hasFirstRoundKeeperConflict/);
+  assert.match(keeperStorage, /FIRST_ROUND_CONFLICT_MESSAGE/);
+  assert.match(keeperStorage, /slot != \? AND cost_round = 1/);
   assert.doesNotMatch(portal, /placeholder="e\.g\. Ja'Marr Chase"/);
 });
 

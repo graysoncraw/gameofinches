@@ -11,7 +11,10 @@ import {
   type WeeklyPlayerFact,
   type WeeklyTeamFact,
 } from "../app/lib/chaos.ts";
-import { projectKeeperCandidate } from "../app/lib/keeper-candidates.ts";
+import {
+  hasFirstRoundKeeperConflict,
+  projectKeeperCandidate,
+} from "../app/lib/keeper-candidates.ts";
 import type { KeeperRecord } from "../app/lib/keepers.ts";
 import type {
   RivalryGame,
@@ -528,4 +531,11 @@ test("keeper history keeps trade cost lineage but applies the correct timer", ()
   assert.equal(inSeason.yearsRemaining, 2);
   assert.equal(offseason.costRound, 5);
   assert.equal(offseason.yearsRemaining, 3);
+});
+
+test("two first-round keepers cannot coexist", () => {
+  assert.equal(hasFirstRoundKeeperConflict(1, 1), true);
+  assert.equal(hasFirstRoundKeeperConflict(1, 2), false);
+  assert.equal(hasFirstRoundKeeperConflict(2, 1), false);
+  assert.equal(hasFirstRoundKeeperConflict(undefined, 1), false);
 });

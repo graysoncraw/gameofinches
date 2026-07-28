@@ -1,6 +1,16 @@
 import type { KeeperCandidate } from "./chaos";
 import type { KeeperRecord } from "./keepers";
 
+export const FIRST_ROUND_CONFLICT_MESSAGE =
+  "Two Round 1 keepers are not allowed. Choose one.";
+
+export function hasFirstRoundKeeperConflict(
+  firstCost: number | null | undefined,
+  secondCost: number | null | undefined,
+) {
+  return firstCost === 1 && secondCost === 1;
+}
+
 export function projectKeeperCandidate(
   candidate: KeeperCandidate,
   keepers: KeeperRecord[],

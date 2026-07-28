@@ -14,7 +14,11 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { KeeperCandidate } from "../lib/chaos";
-import { projectKeeperCandidate } from "../lib/keeper-candidates";
+import {
+  FIRST_ROUND_CONFLICT_MESSAGE,
+  hasFirstRoundKeeperConflict,
+  projectKeeperCandidate,
+} from "../lib/keeper-candidates";
 import type { KeeperRecord } from "../lib/keepers";
 import type { Team } from "../lib/sleeper";
 
@@ -72,7 +76,10 @@ export default function AdminPortal({
   sourceSeason: string;
 }) {
   const editableSeasons = useMemo(
-    () => [...new Set([currentSeason, ...seasons])].sort((a, b) => Number(b) - Number(a)),
+    () =>
+      [...new Set([currentSeason, ...seasons])].sort(
+        (a, b) => Number(b) - Number(a),
+      ),
     [currentSeason, seasons],
   );
   const [season, setSeason] = useState(currentSeason);
@@ -133,6 +140,16 @@ export default function AdminPortal({
   async function save(team: Team, slot: number) {
     const key = draftKey(season, team.rosterId, slot);
     const draft = draftFor(team.rosterId, slot);
+    const otherDraft = draftFor(team.rosterId, slot === 1 ? 2 : 1);
+    if (
+      draft.playerName &&
+      otherDraft.playerName &&
+      hasFirstRoundKeeperConflict(draft.costRound, otherDraft.costRound)
+    ) {
+      setMessage({ type: "error", text: FIRST_ROUND_CONFLICT_MESSAGE });
+      return;
+    }
+
     setSavingKey(key);
     setMessage(null);
 
@@ -262,7 +279,10 @@ export default function AdminPortal({
         </div>
         <label className="admin-season">
           <span>Editing season</span>
-          <select value={season} onChange={(event) => setSeason(event.target.value)}>
+          <select
+            value={season}
+            onChange={(event) => setSeason(event.target.value)}
+          >
             {editableSeasons.map((year) => (
               <option key={year} value={year}>
                 {year}
@@ -300,10 +320,11 @@ export default function AdminPortal({
               <div className="admin-slots">
                 {[1, 2].map((slot) => {
                   const draft = draftFor(team.rosterId, slot);
-                  const otherKeeper = draftFor(
+                  const otherDraft = draftFor(
                     team.rosterId,
                     slot === 1 ? 2 : 1,
-                  ).playerName.toLowerCase();
+                  );
+                  const otherKeeper = otherDraft.playerName.toLowerCase();
                   const candidates = candidatesFor(team).filter(
                     (candidate) =>
                       candidate.playerName.toLowerCase() !== otherKeeper ||
@@ -319,6 +340,15 @@ export default function AdminPortal({
                     draft.playerName && !selectedCandidate
                       ? draft.playerName
                       : null;
+                  const firstRoundTaken =
+                    Boolean(otherDraft.playerName) &&
+                    otherDraft.costRound === 1;
+                  const firstRoundConflict =
+                    Boolean(draft.playerName && otherDraft.playerName) &&
+                    hasFirstRoundKeeperConflict(
+                      draft.costRound,
+                      otherDraft.costRound,
+                    );
                   const key = draftKey(season, team.rosterId, slot);
                   const isSaving = savingKey === key;
                   return (
@@ -373,9 +403,18 @@ export default function AdminPortal({
                               <option
                                 key={candidate.playerId}
                                 value={candidate.playerName}
+                                disabled={
+                                  candidate.playerName !== draft.playerName &&
+                                  firstRoundTaken &&
+                                  candidate.costRound === 1
+                                }
                               >
                                 {candidate.playerName} · {candidate.position} ·
                                 R{candidate.costRound}
+                                {firstRoundTaken &&
+                                candidate.costRound === 1
+                                  ? " · unavailable"
+                                  : ""}
                               </option>
                             ))}
                           </select>
@@ -413,12 +452,32 @@ export default function AdminPortal({
                             }
                           >
                             {Array.from({ length: 19 }, (_, index) => (
-                              <option value={index + 1} key={index + 1}>
+                              <option
+                                value={index + 1}
+                                key={index + 1}
+                                disabled={
+                                  index === 0 &&
+                                  draft.costRound !== 1 &&
+                                  firstRoundTaken
+                                }
+                              >
                                 Round {index + 1}
+                                {index === 0 &&
+                                firstRoundTaken
+                                  ? " · already used"
+                                  : ""}
                               </option>
                             ))}
                           </select>
                         </label>
+                        {firstRoundConflict && (
+                          <p
+                            className="admin-field-error field-wide"
+                            role="alert"
+                          >
+                            {FIRST_ROUND_CONFLICT_MESSAGE}
+                          </p>
+                        )}
                         <label>
                           <span>Keeper stage</span>
                           <select
@@ -469,7 +528,11 @@ export default function AdminPortal({
                         className="admin-save"
                         type="button"
                         onClick={() => save(team, slot)}
-                        disabled={isSaving || !draft.playerName.trim()}
+                        disabled={
+                          isSaving ||
+                          !draft.playerName.trim() ||
+                          firstRoundConflict
+                        }
                       >
                         {isSaving ? (
                           <LoaderCircle
@@ -499,6 +562,7 @@ export default function AdminPortal({
             <li>Waiver pickups begin at an 8th-round cost.</li>
             <li>Players drafted after Round 10 begin at Round 10.</li>
             <li>Two keepers with the same cost occupy consecutive rounds.</li>
+            <li>Two Round 1 keepers cannot be selected.</li>
             <li>Offseason trades reset the timer to three years.</li>
             <li>In-season trades receive two keeper years.</li>
           </ol>
