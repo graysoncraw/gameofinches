@@ -31,6 +31,14 @@ import type {
 } from "../lib/sleeper";
 import LeagueRecords from "./LeagueRecords";
 import TransactionHistory from "./TransactionHistory";
+import {
+  ChaosHub,
+  DraftReportCards,
+  FranchiseDossier,
+  KeeperWarRoom,
+  RecordBookExpansion,
+  TradeTrees,
+} from "./ChaosExperience";
 
 function avatarUrl(avatar: string | null) {
   return avatar ? `https://sleepercdn.com/avatars/thumbs/${avatar}` : null;
@@ -165,10 +173,14 @@ export default function LeagueDashboard({
   data,
   keepers,
   activePage = "overview",
+  initialRecap,
+  profileUserId,
 }: {
   data: LeagueData;
   keepers: KeeperRecord[];
   activePage?: string;
+  initialRecap?: { season: string; week: number };
+  profileUserId?: string;
 }) {
   const current = data.seasons[0];
   const completedSeasons = data.seasons.filter(
@@ -254,6 +266,7 @@ export default function LeagueDashboard({
         <div className="nav-links">
           {[
             ["overview", "/", "Overview"],
+            ["chaos", "/chaos", "Chaos"],
             ["teams", "/teams", "Teams"],
             ["history", "/history", "History"],
             ["records", "/records", "Records"],
@@ -262,7 +275,11 @@ export default function LeagueDashboard({
             ["keepers", "/keepers", "Keepers"],
           ].map(([key, href, label]) => (
             <a
-              className={activePage === key ? "active" : ""}
+              className={
+                (activePage === "profile" ? "teams" : activePage) === key
+                  ? "active"
+                  : ""
+              }
               href={href}
               key={key}
             >
@@ -385,6 +402,10 @@ export default function LeagueDashboard({
         </>
       )}
 
+      {activePage === "chaos" && (
+        <ChaosHub data={data} initialRecap={initialRecap} />
+      )}
+
       {activePage === "teams" && (
       <section className="content-section" id="franchises">
         <div className="section-heading">
@@ -400,7 +421,11 @@ export default function LeagueDashboard({
 
         <div className="team-grid">
           {current.teams.map((team, index) => (
-            <article className="team-card" key={team.rosterId}>
+            <a
+              className="team-card"
+              href={`/teams/${team.userId}`}
+              key={team.rosterId}
+            >
               <div className="team-card-top">
                 <span className="roster-number">
                   ROSTER {String(team.rosterId).padStart(2, "0")}
@@ -423,7 +448,10 @@ export default function LeagueDashboard({
                 <span>{team.playerCount ? `${team.playerCount} players` : "Pre-draft"}</span>
                 <span>Waiver #{team.waiverPosition}</span>
               </div>
-            </article>
+              <span className="team-dossier-link">
+                Open dossier <ArrowUpRight size={14} aria-hidden="true" />
+              </span>
+            </a>
           ))}
         </div>
       </section>
@@ -595,9 +623,15 @@ export default function LeagueDashboard({
         </>
       )}
 
-      {activePage === "records" && <LeagueRecords data={data} />}
+      {activePage === "records" && (
+        <>
+          <LeagueRecords data={data} />
+          <RecordBookExpansion data={data} />
+        </>
+      )}
 
       {activePage === "drafts" && (
+        <>
       <section className="draft-section" id="drafts">
         <div className="section-heading">
           <div>
@@ -683,13 +717,18 @@ export default function LeagueDashboard({
           )}
         </div>
       </section>
+      <DraftReportCards data={data} />
+        </>
       )}
 
       {activePage === "moves" && (
+        <>
       <TransactionHistory
         seasons={data.seasons.map((season) => season.year)}
         defaultSeason={latestCompleted?.year ?? current.year}
       />
+      <TradeTrees data={data} />
+        </>
       )}
 
       {activePage === "keepers" && (
@@ -827,8 +866,19 @@ export default function LeagueDashboard({
           </div>
         </dl>
       </section>
+      <KeeperWarRoom data={data} keepers={keepers} />
         </>
       )}
+
+      {activePage === "profile" &&
+        (() => {
+          const profile = data.chaos.franchises.find(
+            (item) => item.userId === profileUserId,
+          );
+          return profile ? (
+            <FranchiseDossier profile={profile} keepers={keepers} />
+          ) : null;
+        })()}
 
       <footer>
         <a className="brand footer-brand" href="/">

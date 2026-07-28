@@ -64,3 +64,25 @@ test("includes the requested league records and keeper labels", async () => {
   assert.match(portal, /Year 1 · offseason trade · 3 years left/);
   assert.match(portal, /Year 3 · final year/);
 });
+
+test("ships the automatic League Chaos archive", async () => {
+  const [chaos, experience, schema, dashboard] = await Promise.all([
+    file("app/lib/chaos.ts"),
+    file("app/components/ChaosExperience.tsx"),
+    file("db/schema.ts"),
+    file("app/components/LeagueDashboard.tsx"),
+  ]);
+
+  assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
+  assert.match(chaos, /optimalLineupPoints/);
+  assert.match(chaos, /buildWeeklyRecaps/);
+  assert.match(chaos, /buildDraftReports/);
+  assert.match(chaos, /buildTradeAnalyses/);
+  assert.match(experience, /THE GAME OF INCHES/);
+  assert.match(experience, /The draft report cards/);
+  assert.match(experience, /Trade trees & impact verdicts/);
+  assert.match(experience, /PUBLIC KEEPER LAB/);
+  assert.match(schema, /sleeperWeeklyPlayers/);
+  assert.match(schema, /sleeperWeeklyTeams/);
+  assert.match(dashboard, /"chaos", "\/chaos", "Chaos"/);
+});

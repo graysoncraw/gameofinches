@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Home from "../page";
 
 const SECTIONS = new Set([
+  "chaos",
   "teams",
   "history",
   "records",
@@ -12,6 +13,7 @@ const SECTIONS = new Set([
 ]);
 
 const TITLES: Record<string, string> = {
+  chaos: "The Gazette & League Chaos",
   teams: "Teams",
   history: "League History",
   records: "Records & Rivalries",

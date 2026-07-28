@@ -3,6 +3,7 @@
 import LeagueDashboard from "./components/LeagueDashboard";
 import { getKeeperRecords } from "./lib/keepers";
 import { getLeagueData } from "./lib/sleeper";
+import type { LeagueData } from "./lib/sleeper";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +20,66 @@ async function loadHomeData() {
   }
 }
 
+function dataForPage(
+  data: LeagueData,
+  activePage: string,
+  profileUserId?: string,
+): LeagueData {
+  const chaos = data.chaos;
+  return {
+    ...data,
+    chaos: {
+      ...chaos,
+      recaps: activePage === "chaos" ? chaos.recaps : [],
+      records:
+        activePage === "chaos" ||
+        activePage === "records" ||
+        activePage === "profile"
+          ? chaos.records
+          : [],
+      elo:
+        activePage === "chaos" ||
+        activePage === "records" ||
+        activePage === "profile"
+          ? chaos.elo
+          : { standings: [], timeline: [] },
+      drafts:
+        activePage === "drafts" || activePage === "profile"
+          ? chaos.drafts
+          : [],
+      trades: activePage === "moves" ? chaos.trades : [],
+      superlatives: activePage === "chaos" ? chaos.superlatives : [],
+      franchises:
+        activePage === "profile"
+          ? chaos.franchises.filter(
+              (franchise) => franchise.userId === profileUserId,
+            )
+          : [],
+      keeperCandidates:
+        activePage === "keepers" ? chaos.keeperCandidates : [],
+    },
+  };
+}
+
 export default async function Home({
   activePage = "overview",
+  initialRecap,
+  profileUserId,
 }: {
   activePage?: string;
+  initialRecap?: { season: string; week: number };
+  profileUserId?: string;
 } = {}) {
   const result = await loadHomeData();
   if (result) {
+    const pageData = dataForPage(result.data, activePage, profileUserId);
     return (
       <LeagueDashboard
         activePage={activePage}
-        data={result.data}
+        data={pageData}
+        initialRecap={initialRecap}
         keepers={result.keepers}
+        profileUserId={profileUserId}
       />
     );
   }

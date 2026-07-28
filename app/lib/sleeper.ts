@@ -1,4 +1,12 @@
 import { env } from "cloudflare:workers";
+import {
+  buildLeagueChaos,
+  CHAOS_SCHEMA_VERSION,
+  optimalLineupPoints,
+  type LeagueChaos,
+  type WeeklyPlayerFact,
+  type WeeklyTeamFact,
+} from "./chaos";
 
 const SLEEPER_API = "https://api.sleeper.app/v1";
 const CURRENT_LEAGUE_ID = "1380998304963235840";
@@ -74,6 +82,7 @@ type SleeperMatchup = {
   points: number | null;
   custom_points: number | null;
   starters: string[] | null;
+  players: string[] | null;
   players_points?: Record<string, number>;
 };
 
@@ -263,6 +272,7 @@ export type LeagueData = {
     managers: FinancialManager[];
     seasons: FinancialSeason[];
   };
+  chaos: LeagueChaos;
 };
 
 export type LeagueTransaction = {
@@ -283,11 +293,16 @@ export type LeagueTransaction = {
     round: number;
     from: string;
     to: string;
+    originalRosterId: number;
+    previousOwnerRosterId: number;
+    ownerRosterId: number;
   }>;
   faabTransfers: Array<{
     amount: number;
     from: string;
     to: string;
+    senderRosterId: number;
+    receiverRosterId: number;
   }>;
 };
 
@@ -306,22 +321,57 @@ type SeasonLoad = {
   season: Season;
   matchupGames: RivalryGame[];
   performances: PlayerPerformance[];
+  teamFacts: WeeklyTeamFact[];
+  playerFacts: WeeklyPlayerFact[];
 };
 
 type LeagueSnapshot = {
+  schemaVersion: number;
   data: LeagueData;
   transactions: Record<string, TransactionFeed>;
+  facts: {
+    teams: WeeklyTeamFact[];
+    players: WeeklyPlayerFact[];
+  };
 };
 
-async function sleeperFetch<T>(path: string): Promise<T> {
-  const response = await fetch(`${SLEEPER_API}${path}`, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw new Error(`Sleeper returned ${response.status} for ${path}`);
+let activeSleeperRequests = 0;
+const sleeperWaiters: Array<() => void> = [];
+
+async function claimSleeperSlot() {
+  if (activeSleeperRequests >= 4) {
+    await new Promise<void>((resolve) => sleeperWaiters.push(resolve));
   }
-  return response.json() as Promise<T>;
+  activeSleeperRequests += 1;
+}
+
+function releaseSleeperSlot() {
+  activeSleeperRequests -= 1;
+  sleeperWaiters.shift()?.();
+}
+
+async function sleeperFetch<T>(path: string): Promise<T> {
+  await claimSleeperSlot();
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const response = await fetch(`${SLEEPER_API}${path}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (response.ok) return response.json() as Promise<T>;
+      if (![429, 500, 502, 503, 504].includes(response.status) || attempt === 2) {
+        throw new Error(`Sleeper returned ${response.status} for ${path}`);
+      }
+      const retryAfter = Number(response.headers.get("retry-after") ?? 0);
+      const delay = retryAfter
+        ? Math.min(retryAfter * 1000, 10_000)
+        : 500 * 2 ** attempt;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    throw new Error(`Sleeper did not answer ${path}`);
+  } finally {
+    releaseSleeperSlot();
+  }
 }
 
 function getD1(): D1Database | null {
@@ -356,6 +406,47 @@ async function ensureSnapshotSchema(db: D1Database) {
         fetched_date TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )`,
+    ),
+    db.prepare(
+      `CREATE TABLE IF NOT EXISTS sleeper_weekly_teams (
+        season TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        roster_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        manager TEXT NOT NULL,
+        team_name TEXT NOT NULL,
+        matchup_id INTEGER NOT NULL,
+        opponent_roster_id INTEGER NOT NULL,
+        opponent_id TEXT NOT NULL,
+        points REAL NOT NULL,
+        optimal_points REAL NOT NULL,
+        postseason INTEGER NOT NULL,
+        result TEXT NOT NULL,
+        PRIMARY KEY (season, week, roster_id)
+      )`,
+    ),
+    db.prepare(
+      `CREATE TABLE IF NOT EXISTS sleeper_weekly_players (
+        season TEXT NOT NULL,
+        week INTEGER NOT NULL,
+        roster_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        player_id TEXT NOT NULL,
+        player_name TEXT NOT NULL,
+        position TEXT NOT NULL,
+        nfl_team TEXT NOT NULL,
+        points REAL NOT NULL,
+        starter INTEGER NOT NULL,
+        PRIMARY KEY (season, week, roster_id, player_id)
+      )`,
+    ),
+    db.prepare(
+      `CREATE INDEX IF NOT EXISTS sleeper_weekly_players_owner_idx
+       ON sleeper_weekly_players (user_id, season, week)`,
+    ),
+    db.prepare(
+      `CREATE INDEX IF NOT EXISTS sleeper_weekly_players_player_idx
+       ON sleeper_weekly_players (player_id, season, week)`,
     ),
   ]);
 }
@@ -454,6 +545,80 @@ async function finishSync(
     )
     .bind(status, new Date().toISOString(), error.slice(0, 500), slot)
     .run();
+}
+
+async function persistFacts(
+  db: D1Database,
+  facts: LeagueSnapshot["facts"],
+  seasons: string[],
+) {
+  for (const season of seasons) {
+    await db.batch([
+      db
+        .prepare("DELETE FROM sleeper_weekly_teams WHERE season = ?")
+        .bind(season),
+      db
+        .prepare("DELETE FROM sleeper_weekly_players WHERE season = ?")
+        .bind(season),
+    ]);
+  }
+
+  const teamStatements = facts.teams
+    .filter((fact) => seasons.includes(fact.season))
+    .map((fact) =>
+      db
+        .prepare(
+          `INSERT INTO sleeper_weekly_teams (
+            season, week, roster_id, user_id, manager, team_name, matchup_id,
+            opponent_roster_id, opponent_id, points, optimal_points,
+            postseason, result
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          fact.season,
+          fact.week,
+          fact.rosterId,
+          fact.userId,
+          fact.manager,
+          fact.teamName,
+          fact.matchupId,
+          fact.opponentRosterId,
+          fact.opponentId,
+          fact.points,
+          fact.optimalPoints,
+          fact.postseason ? 1 : 0,
+          fact.result,
+        ),
+    );
+  const playerStatements = facts.players
+    .filter((fact) => seasons.includes(fact.season))
+    .map((fact) =>
+      db
+        .prepare(
+          `INSERT INTO sleeper_weekly_players (
+            season, week, roster_id, user_id, player_id, player_name,
+            position, nfl_team, points, starter
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          fact.season,
+          fact.week,
+          fact.rosterId,
+          fact.userId,
+          fact.playerId,
+          fact.playerName,
+          fact.position,
+          fact.nflTeam,
+          fact.points,
+          fact.starter ? 1 : 0,
+        ),
+    );
+  for (let index = 0; index < teamStatements.length; index += 75) {
+    await db.batch(teamStatements.slice(index, index + 75));
+  }
+  for (let index = 0; index < playerStatements.length; index += 75) {
+    await db.batch(playerStatements.slice(index, index + 75));
+  }
 }
 
 async function loadPlayers(db: D1Database | null) {
@@ -577,6 +742,8 @@ async function loadSeason(
 
   const matchupGames: RivalryGame[] = [];
   const performances: PlayerPerformance[] = [];
+  const teamFacts: WeeklyTeamFact[] = [];
+  const playerFacts: WeeklyPlayerFact[] = [];
   weeklyMatchups.forEach((matchups, weekIndex) => {
     const week = weekIndex + 1;
     const groups = new Map<number, SleeperMatchup[]>();
@@ -631,6 +798,54 @@ async function loadSeason(
         [first, teamA, teamB],
         [second, teamB, teamA],
       ] as Array<[SleeperMatchup, Team, Team]>) {
+        const rosteredPlayers =
+          matchup.players ?? Object.keys(matchup.players_points ?? {});
+        const weeklyPlayers = rosteredPlayers.map((playerId) => {
+          const label = playerLabel(playerId, players);
+          return {
+            season: league.season,
+            week,
+            rosterId: owner.rosterId,
+            userId: owner.userId,
+            playerId,
+            playerName: label.name,
+            position: label.position,
+            nflTeam: label.nflTeam,
+            points: Number(matchup.players_points?.[playerId] ?? 0),
+            starter: (matchup.starters ?? []).includes(playerId),
+          };
+        });
+        playerFacts.push(...weeklyPlayers);
+        const ownerPoints = Number(
+          matchup.custom_points ?? matchup.points ?? 0,
+        );
+        const opponentMatchup = matchup === first ? second : first;
+        const opponentPoints = Number(
+          opponentMatchup.custom_points ?? opponentMatchup.points ?? 0,
+        );
+        teamFacts.push({
+          season: league.season,
+          week,
+          rosterId: owner.rosterId,
+          userId: owner.userId,
+          manager: owner.manager,
+          teamName: owner.teamName,
+          matchupId: matchup.matchup_id ?? 0,
+          opponentRosterId: opponent.rosterId,
+          opponentId: opponent.userId,
+          points: ownerPoints,
+          optimalPoints: optimalLineupPoints(
+            league.roster_positions,
+            weeklyPlayers,
+          ),
+          postseason: week >= (league.settings.playoff_week_start ?? 99),
+          result:
+            ownerPoints === opponentPoints
+              ? "tie"
+              : ownerPoints > opponentPoints
+                ? "win"
+                : "loss",
+        });
         for (const playerId of matchup.starters ?? []) {
           const label = playerLabel(playerId, players);
           performances.push({
@@ -710,6 +925,8 @@ async function loadSeason(
     },
     matchupGames,
     performances,
+    teamFacts,
+    playerFacts,
   };
 }
 
@@ -953,11 +1170,16 @@ async function loadTransactionFeed(
           round: pick.round,
           from: teamName(pick.previous_owner_id),
           to: teamName(pick.owner_id),
+          originalRosterId: pick.roster_id,
+          previousOwnerRosterId: pick.previous_owner_id,
+          ownerRosterId: pick.owner_id,
         })),
         faabTransfers: (transaction.waiver_budget ?? []).map((transfer) => ({
           amount: transfer.amount,
           from: teamName(transfer.sender),
           to: teamName(transfer.receiver),
+          senderRosterId: transfer.sender,
+          receiverRosterId: transfer.receiver,
         })),
       };
     })
@@ -987,7 +1209,9 @@ async function buildSnapshot(
     (season) => season.year === currentLeague.season,
   );
   const isSameLeague =
-    previousCurrent?.leagueId === currentLeague.league_id && Boolean(previous);
+    previousCurrent?.leagueId === currentLeague.league_id &&
+    previous?.schemaVersion === CHAOS_SCHEMA_VERSION &&
+    Boolean(previous?.facts);
 
   const leagueChain: SleeperLeague[] = [currentLeague];
   if (!isSameLeague) {
@@ -1054,9 +1278,32 @@ async function buildSnapshot(
     }
   }
 
+  const previousTeamFacts =
+    previous?.facts?.teams.filter(
+      (fact) => fact.season !== currentLeague.season,
+    ) ?? [];
+  const previousPlayerFacts =
+    previous?.facts?.players.filter(
+      (fact) => fact.season !== currentLeague.season,
+    ) ?? [];
+  const teamFacts = isSameLeague
+    ? [...previousTeamFacts, ...refreshedCurrent.teamFacts]
+    : loads.flatMap((load) => load.teamFacts);
+  const playerFacts = isSameLeague
+    ? [...previousPlayerFacts, ...refreshedCurrent.playerFacts]
+    : loads.flatMap((load) => load.playerFacts);
+  const chaos = buildLeagueChaos({
+    seasons,
+    games,
+    teamFacts,
+    playerFacts,
+    transactions,
+    archiveReady: true,
+  });
   const fetchedAt = new Date().toISOString();
   const completed = seasons.filter((season) => season.status === "complete");
   return {
+    schemaVersion: CHAOS_SCHEMA_VERSION,
     data: {
       leagueName: currentLeague.name || "Game of Inches",
       fetchedAt,
@@ -1071,8 +1318,13 @@ async function buildSnapshot(
       rivalries: buildRivalries(games),
       topPerformances: performances,
       finances: buildFinances(seasons),
+      chaos,
     },
     transactions,
+    facts: {
+      teams: teamFacts,
+      players: playerFacts,
+    },
   };
 }
 
@@ -1092,6 +1344,16 @@ async function getSnapshot(): Promise<LeagueSnapshot> {
 
   try {
     const fresh = await buildSnapshot(cached, db);
+    const fullFactBackfill =
+      cached?.schemaVersion !== CHAOS_SCHEMA_VERSION ||
+      cached?.data.currentSeason !== fresh.data.currentSeason;
+    await persistFacts(
+      db,
+      fresh.facts,
+      fullFactBackfill
+        ? fresh.data.seasons.map((season) => season.year)
+        : [fresh.data.currentSeason],
+    );
     await db
       .prepare(
         `INSERT INTO sleeper_snapshots (snapshot_key, data_json, synced_at)
@@ -1116,8 +1378,92 @@ async function getSnapshot(): Promise<LeagueSnapshot> {
   }
 }
 
+function addChaosFallback(snapshot: LeagueSnapshot) {
+  if (snapshot.data.chaos) return snapshot;
+  const games = snapshot.data.rivalries.flatMap((rivalry) => rivalry.games);
+  const teamsBySeason = new Map(
+    snapshot.data.seasons.flatMap((season) =>
+      season.teams.map((team) => [`${season.year}:${team.userId}`, team] as const),
+    ),
+  );
+  const teamFacts: WeeklyTeamFact[] = games.flatMap((game, index) => {
+    const teamA = teamsBySeason.get(`${game.season}:${game.managerAId}`);
+    const teamB = teamsBySeason.get(`${game.season}:${game.managerBId}`);
+    return [
+      {
+        season: game.season,
+        week: game.week,
+        rosterId: teamA?.rosterId ?? index * 2 + 1,
+        userId: game.managerAId,
+        manager: game.managerA,
+        teamName: game.teamA,
+        matchupId: index + 1,
+        opponentRosterId: teamB?.rosterId ?? index * 2 + 2,
+        opponentId: game.managerBId,
+        points: game.pointsA,
+        optimalPoints: game.pointsA,
+        postseason: game.postseason,
+        result:
+          game.pointsA === game.pointsB
+            ? "tie"
+            : game.pointsA > game.pointsB
+              ? "win"
+              : "loss",
+      },
+      {
+        season: game.season,
+        week: game.week,
+        rosterId: teamB?.rosterId ?? index * 2 + 2,
+        userId: game.managerBId,
+        manager: game.managerB,
+        teamName: game.teamB,
+        matchupId: index + 1,
+        opponentRosterId: teamA?.rosterId ?? index * 2 + 1,
+        opponentId: game.managerAId,
+        points: game.pointsB,
+        optimalPoints: game.pointsB,
+        postseason: game.postseason,
+        result:
+          game.pointsA === game.pointsB
+            ? "tie"
+            : game.pointsB > game.pointsA
+              ? "win"
+              : "loss",
+      },
+    ];
+  });
+  const playerFacts: WeeklyPlayerFact[] = snapshot.data.topPerformances.map(
+    (performance, index) => {
+      const team = teamsBySeason.get(
+        `${performance.season}:${performance.ownerId}`,
+      );
+      return {
+        season: performance.season,
+        week: performance.week,
+        rosterId: team?.rosterId ?? index + 1,
+        userId: performance.ownerId,
+        playerId: performance.playerId,
+        playerName: performance.playerName,
+        position: performance.position,
+        nflTeam: "",
+        points: performance.points,
+        starter: true,
+      };
+    },
+  );
+  snapshot.data.chaos = buildLeagueChaos({
+    seasons: snapshot.data.seasons,
+    games,
+    teamFacts,
+    playerFacts,
+    transactions: snapshot.transactions,
+    archiveReady: false,
+  });
+  return snapshot;
+}
+
 export async function getLeagueData(): Promise<LeagueData> {
-  return (await getSnapshot()).data;
+  return addChaosFallback(await getSnapshot()).data;
 }
 
 export async function getTransactionFeed(

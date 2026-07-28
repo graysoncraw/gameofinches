@@ -15,6 +15,13 @@
       "when": 1785250111565,
       "tag": "0001_unknown_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785272972858,
+      "tag": "0002_same_madame_web",
+      "breakpoints": true
     }
   ]
 }

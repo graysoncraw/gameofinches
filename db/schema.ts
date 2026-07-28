@@ -1,4 +1,11 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 export const keepers = sqliteTable(
   "keepers",
@@ -54,3 +61,58 @@ export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
   failures: integer("failures").notNull().default(0),
   blockedUntil: integer("blocked_until").notNull().default(0),
 });
+
+export const sleeperWeeklyTeams = sqliteTable(
+  "sleeper_weekly_teams",
+  {
+    season: text("season").notNull(),
+    week: integer("week").notNull(),
+    rosterId: integer("roster_id").notNull(),
+    userId: text("user_id").notNull(),
+    manager: text("manager").notNull(),
+    teamName: text("team_name").notNull(),
+    matchupId: integer("matchup_id").notNull(),
+    opponentRosterId: integer("opponent_roster_id").notNull(),
+    opponentId: text("opponent_id").notNull(),
+    points: real("points").notNull(),
+    optimalPoints: real("optimal_points").notNull(),
+    postseason: integer("postseason", { mode: "boolean" }).notNull(),
+    result: text("result").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.season, table.week, table.rosterId] }),
+  ],
+);
+
+export const sleeperWeeklyPlayers = sqliteTable(
+  "sleeper_weekly_players",
+  {
+    season: text("season").notNull(),
+    week: integer("week").notNull(),
+    rosterId: integer("roster_id").notNull(),
+    userId: text("user_id").notNull(),
+    playerId: text("player_id").notNull(),
+    playerName: text("player_name").notNull(),
+    position: text("position").notNull(),
+    nflTeam: text("nfl_team").notNull(),
+    points: real("points").notNull(),
+    starter: integer("starter", { mode: "boolean" }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.season, table.week, table.rosterId, table.playerId],
+    }),
+    uniqueIndex("sleeper_weekly_players_owner_idx").on(
+      table.userId,
+      table.season,
+      table.week,
+      table.playerId,
+    ),
+    uniqueIndex("sleeper_weekly_players_player_idx").on(
+      table.playerId,
+      table.season,
+      table.week,
+      table.rosterId,
+    ),
+  ],
+);

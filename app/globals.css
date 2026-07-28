@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./chaos.css";
 
 :root {
   --ink: #0d1618;
