@@ -5,8 +5,6 @@ import {
   buildElo,
   buildKeeperCandidates,
   buildRecordBook,
-  buildTradeAnalyses,
-  buildWeeklyRecaps,
   optimalLineupPoints,
   type WeeklyPlayerFact,
   type WeeklyTeamFact,
@@ -14,7 +12,7 @@ import {
 import {
   hasFirstRoundKeeperConflict,
   projectKeeperCandidate,
-} from "../app/lib/keeper-candidates.ts";
+} from "../app/lib/keeper-rules.ts";
 import type { KeeperRecord } from "../app/lib/keepers.ts";
 import type {
   RivalryGame,
@@ -206,21 +204,6 @@ test("record book excludes unplayed zero games and tracks bench gaps", () => {
   );
 });
 
-test("Gazette copy is deterministic for the same season and week", () => {
-  const elo = buildElo(
-    [game],
-    new Map([
-      ["a", teamA],
-      ["b", teamB],
-    ]),
-  );
-  const records = buildRecordBook([game], []);
-  const first = buildWeeklyRecaps([game], [], elo.timeline, records);
-  const second = buildWeeklyRecaps([game], [], elo.timeline, records);
-  assert.deepEqual(first, second);
-  assert.match(first[0].dek, /Alpha/);
-});
-
 test("draft grades exclude keeper picks and remain transparent", () => {
   const facts: WeeklyPlayerFact[] = [
     {
@@ -252,69 +235,6 @@ test("draft grades exclude keeper picks and remain transparent", () => {
   assert.equal(reports[0].picks.length, 2);
   assert.ok(reports[0].picks.every((pick) => pick.playerId !== "keeper"));
   assert.equal(reports[0].teams[0].grade, "A+");
-});
-
-test("trade analysis supports multiple sides and close-call verdicts", () => {
-  const feed: TransactionFeed = {
-    season: "2025",
-    counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
-    transactions: [
-      {
-        id: "trade",
-        type: "trade",
-        week: 1,
-        created: 1,
-        waiverBid: null,
-        teams: [
-          {
-            rosterId: 1,
-            teamName: "Alpha Team",
-            manager: "Alpha",
-            adds: [{ id: "p2", name: "Starter Two", position: "WR", nflTeam: "BBB" }],
-            drops: [{ id: "p1", name: "Starter One", position: "QB", nflTeam: "AAA" }],
-          },
-          {
-            rosterId: 2,
-            teamName: "Bravo Team",
-            manager: "Bravo",
-            adds: [{ id: "p1", name: "Starter One", position: "QB", nflTeam: "AAA" }],
-            drops: [{ id: "p2", name: "Starter Two", position: "WR", nflTeam: "BBB" }],
-          },
-        ],
-        draftPicks: [],
-        faabTransfers: [],
-      },
-    ],
-  };
-  const facts: WeeklyPlayerFact[] = [
-    {
-      season: "2025",
-      week: 1,
-      rosterId: 1,
-      userId: "a",
-      playerId: "p2",
-      playerName: "Starter Two",
-      position: "WR",
-      nflTeam: "BBB",
-      points: 20,
-      starter: true,
-    },
-    {
-      season: "2025",
-      week: 1,
-      rosterId: 2,
-      userId: "b",
-      playerId: "p1",
-      playerName: "Starter One",
-      position: "QB",
-      nflTeam: "AAA",
-      points: 17,
-      starter: true,
-    },
-  ];
-  const report = buildTradeAnalyses([season], { "2025": feed }, facts)[0];
-  assert.equal(report.sides.length, 2);
-  assert.equal(report.verdict, "Too close to call");
 });
 
 test("keeper candidates apply draft, waiver, and trade clocks", () => {

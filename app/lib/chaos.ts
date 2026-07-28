@@ -1,13 +1,12 @@
 import type {
   DraftPick,
-  LeagueTransaction,
   RivalryGame,
   Season,
   Team,
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 4;
+export const CHAOS_SCHEMA_VERSION = 5;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -71,50 +70,6 @@ export type RecordEntry = {
   flavor: string;
 };
 
-export type WeeklyRecap = {
-  id: string;
-  season: string;
-  week: number;
-  postseason: boolean;
-  headline: string;
-  dek: string;
-  highScore: { manager: string; teamName: string; points: number };
-  closestGame: {
-    winner: string;
-    loser: string;
-    winnerPoints: number;
-    loserPoints: number;
-    margin: number;
-  };
-  blowout: {
-    winner: string;
-    loser: string;
-    margin: number;
-  };
-  heartbreak: {
-    manager: string;
-    teamName: string;
-    points: number;
-  } | null;
-  benchCrime: {
-    manager: string;
-    teamName: string;
-    gap: number;
-  } | null;
-  upset: {
-    winner: string;
-    loser: string;
-    eloGap: number;
-  } | null;
-  standingsMove: {
-    manager: string;
-    from: number;
-    to: number;
-    delta: number;
-  } | null;
-  recordsBroken: string[];
-};
-
 export type DraftPickGrade = DraftPick & {
   production: number;
   expected: number;
@@ -143,26 +98,6 @@ export type DraftReport = {
     picks: number;
     averageValue: number;
   }>;
-};
-
-export type TradeSide = {
-  rosterId: number;
-  manager: string;
-  teamName: string;
-  received: string[];
-  sent: string[];
-  impact: number;
-};
-
-export type TradeAnalysis = {
-  id: string;
-  season: string;
-  week: number;
-  created: number;
-  sides: TradeSide[];
-  verdict: string;
-  status: "final" | "provisional" | "pending";
-  hasUnresolvedPicks: boolean;
 };
 
 export type Superlative = {
@@ -201,7 +136,6 @@ export type FranchiseProfile = {
     season: string;
     week: number;
   }>;
-  draftGrades: Array<{ season: string; grade: string; score: number }>;
   tradeCount: number;
   waiverCount: number;
   faabSpent: number;
@@ -224,14 +158,11 @@ export type KeeperCandidate = {
 export type LeagueChaos = {
   schemaVersion: number;
   archiveReady: boolean;
-  recaps: WeeklyRecap[];
   records: RecordEntry[];
   elo: {
     standings: EloStanding[];
     timeline: EloPoint[];
   };
-  drafts: DraftReport[];
-  trades: TradeAnalysis[];
   superlatives: Superlative[];
   franchises: FranchiseProfile[];
   keeperCandidates: KeeperCandidate[];
@@ -615,216 +546,6 @@ export function buildRecordBook(
   return records.filter((record): record is RecordEntry => Boolean(record));
 }
 
-function recapCopy(
-  season: string,
-  week: number,
-  high: { manager: string; teamName: string; points: number },
-  closest: WeeklyRecap["closestGame"],
-  blowout: WeeklyRecap["blowout"],
-) {
-  const headlines = [
-    `${high.teamName} owns the week`,
-    `${high.manager} lights the scoreboard`,
-    `Week ${week} leaves receipts`,
-    `No mercy in the margins`,
-  ];
-  const index = (Number(season) + week + Math.round(high.points)) % headlines.length;
-  return {
-    headline: headlines[index],
-    dek: `${high.manager} set the pace with ${high.points.toFixed(2)}, while ${closest.winner} survived by ${closest.margin.toFixed(2)} and ${blowout.winner} delivered the week’s largest beating.`,
-  };
-}
-
-export function buildWeeklyRecaps(
-  games: RivalryGame[],
-  teamFacts: WeeklyTeamFact[],
-  eloTimeline: EloPoint[],
-  records: RecordEntry[],
-): WeeklyRecap[] {
-  const grouped = new Map<string, RivalryGame[]>();
-  for (const game of completedGames(games)) {
-    const key = `${game.season}-${game.week}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), game]);
-  }
-  const factsByWeek = new Map<string, WeeklyTeamFact[]>();
-  for (const fact of teamFacts) {
-    const key = `${fact.season}-${fact.week}`;
-    factsByWeek.set(key, [...(factsByWeek.get(key) ?? []), fact]);
-  }
-  const rankAt = (season: string, throughWeek: number) => {
-    const rows = new Map<
-      string,
-      { manager: string; wins: number; ties: number; points: number }
-    >();
-    for (const game of completedGames(games).filter(
-      (item) =>
-        item.season === season &&
-        item.week <= throughWeek &&
-        !item.postseason,
-    )) {
-      for (const side of gameSides(game)) {
-        const row = rows.get(side.userId) ?? {
-          manager: side.manager,
-          wins: 0,
-          ties: 0,
-          points: 0,
-        };
-        row.points += side.points;
-        if (game.winnerId === side.userId) row.wins += 1;
-        if (game.winnerId === null) row.ties += 1;
-        rows.set(side.userId, row);
-      }
-    }
-    return new Map(
-      [...rows.entries()]
-        .sort(
-          (a, b) =>
-            b[1].wins - a[1].wins ||
-            b[1].ties - a[1].ties ||
-            b[1].points - a[1].points,
-        )
-        .map(([id, row], index) => [
-          id,
-          { manager: row.manager, rank: index + 1 },
-        ]),
-    );
-  };
-
-  return [...grouped.entries()]
-    .map(([id, weekGames]) => {
-      const season = weekGames[0].season;
-      const week = weekGames[0].week;
-      const sides = weekGames.flatMap(gameSides);
-      const high = [...sides].sort((a, b) => b.points - a.points)[0];
-      const margins = weekGames
-        .map((game) => {
-          const aWon = game.pointsA >= game.pointsB;
-          return {
-            game,
-            winner: aWon ? game.managerA : game.managerB,
-            loser: aWon ? game.managerB : game.managerA,
-            winnerPoints: aWon ? game.pointsA : game.pointsB,
-            loserPoints: aWon ? game.pointsB : game.pointsA,
-            margin: Math.abs(game.pointsA - game.pointsB),
-          };
-        })
-        .sort((a, b) => a.margin - b.margin);
-      const closest = margins[0];
-      const blowoutGame = [...margins].sort((a, b) => b.margin - a.margin)[0];
-      const loss = [...sides]
-        .filter((side) => side.points < side.opponentPoints)
-        .sort((a, b) => b.points - a.points)[0];
-      const facts = factsByWeek.get(id) ?? [];
-      const bench = facts
-        .map((fact) => ({ ...fact, gap: fact.optimalPoints - fact.points }))
-        .filter((fact) => fact.gap > 0)
-        .sort((a, b) => b.gap - a.gap)[0];
-
-      const previousRatings = new Map<string, number>();
-      for (const point of eloTimeline) {
-        if (
-          Number(point.season) < Number(season) ||
-          (point.season === season && point.week < week)
-        ) {
-          previousRatings.set(point.userId, point.rating);
-        }
-      }
-      const upsets = weekGames
-        .filter((game) => game.winnerId)
-        .map((game) => {
-          const winnerId = game.winnerId!;
-          const loserId =
-            winnerId === game.managerAId ? game.managerBId : game.managerAId;
-          const winner =
-            winnerId === game.managerAId ? game.managerA : game.managerB;
-          const loser =
-            winnerId === game.managerAId ? game.managerB : game.managerA;
-          return {
-            winner,
-            loser,
-            eloGap:
-              (previousRatings.get(loserId) ?? 1500) -
-              (previousRatings.get(winnerId) ?? 1500),
-          };
-        })
-        .filter((upset) => upset.eloGap > 0)
-        .sort((a, b) => b.eloGap - a.eloGap);
-      const beforeRanks = rankAt(season, week - 1);
-      const afterRanks = rankAt(season, week);
-      const standingsMove = [...afterRanks.entries()]
-        .map(([id, after]) => {
-          const before = beforeRanks.get(id);
-          return before
-            ? {
-                manager: after.manager,
-                from: before.rank,
-                to: after.rank,
-                delta: before.rank - after.rank,
-              }
-            : null;
-        })
-        .filter(
-          (
-            move,
-          ): move is {
-            manager: string;
-            from: number;
-            to: number;
-            delta: number;
-          } => Boolean(move && move.delta > 0),
-        )
-        .sort((a, b) => b.delta - a.delta)[0] ?? null;
-      const copy = recapCopy(season, week, high, closest, blowoutGame);
-      return {
-        id,
-        season,
-        week,
-        postseason: weekGames.some((game) => game.postseason),
-        ...copy,
-        highScore: {
-          manager: high.manager,
-          teamName: high.teamName,
-          points: high.points,
-        },
-        closestGame: {
-          winner: closest.winner,
-          loser: closest.loser,
-          winnerPoints: closest.winnerPoints,
-          loserPoints: closest.loserPoints,
-          margin: closest.margin,
-        },
-        blowout: {
-          winner: blowoutGame.winner,
-          loser: blowoutGame.loser,
-          margin: blowoutGame.margin,
-        },
-        heartbreak: loss
-          ? {
-              manager: loss.manager,
-              teamName: loss.teamName,
-              points: loss.points,
-            }
-          : null,
-        benchCrime: bench
-          ? {
-              manager: bench.manager,
-              teamName: bench.teamName,
-              gap: rounded(bench.gap),
-            }
-          : null,
-        upset: upsets[0] ?? null,
-        standingsMove,
-        recordsBroken: records
-          .filter((record) => record.season === season && record.week === week)
-          .map((record) => record.label),
-      };
-    })
-    .sort(
-      (a, b) =>
-        Number(b.season) - Number(a.season) || b.week - a.week,
-    );
-}
-
 function median(values: number[]) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -976,101 +697,6 @@ export function buildDraftReports(
       };
     })
     .sort((a, b) => Number(b.season) - Number(a.season));
-}
-
-function assetsForSide(transaction: LeagueTransaction, rosterId: number) {
-  const team = transaction.teams.find((side) => side.rosterId === rosterId);
-  const received = [
-    ...(team?.adds.map((player) => player.name) ?? []),
-    ...transaction.draftPicks
-      .filter((pick) => pick.ownerRosterId === rosterId)
-      .map((pick) => `${pick.season} Round ${pick.round} pick`),
-    ...transaction.faabTransfers
-      .filter((transfer) => transfer.receiverRosterId === rosterId)
-      .map((transfer) => `$${transfer.amount} FAAB`),
-  ];
-  const sent = [
-    ...(team?.drops.map((player) => player.name) ?? []),
-    ...transaction.draftPicks
-      .filter((pick) => pick.previousOwnerRosterId === rosterId)
-      .map((pick) => `${pick.season} Round ${pick.round} pick`),
-    ...transaction.faabTransfers
-      .filter((transfer) => transfer.senderRosterId === rosterId)
-      .map((transfer) => `$${transfer.amount} FAAB`),
-  ];
-  return { received, sent };
-}
-
-export function buildTradeAnalyses(
-  seasons: Season[],
-  transactions: Record<string, TransactionFeed>,
-  playerFacts: WeeklyPlayerFact[],
-): TradeAnalysis[] {
-  const complete = new Set(
-    seasons.filter((season) => season.status === "complete").map((season) => season.year),
-  );
-  const reports: TradeAnalysis[] = [];
-  for (const [season, feed] of Object.entries(transactions)) {
-    for (const transaction of feed.transactions.filter(
-      (item) => item.type === "trade",
-    )) {
-      const rosterIds = transaction.teams.map((team) => team.rosterId);
-      const sides = rosterIds.map((rosterId) => {
-        const team = transaction.teams.find((item) => item.rosterId === rosterId)!;
-        const receivedIds = new Set(team.adds.map((player) => player.id));
-        const impact = playerFacts
-          .filter(
-            (fact) =>
-              fact.season === season &&
-              fact.week >= transaction.week &&
-              fact.rosterId === rosterId &&
-              fact.starter &&
-              receivedIds.has(fact.playerId),
-          )
-          .reduce((total, fact) => total + fact.points, 0);
-        return {
-          rosterId,
-          manager: team.manager,
-          teamName: team.teamName,
-          ...assetsForSide(transaction, rosterId),
-          impact: rounded(impact),
-        };
-      });
-      const unresolved = transaction.draftPicks.some(
-        (pick) =>
-          !seasons
-            .find((item) => item.year === pick.season)
-            ?.draft?.picks.some(
-              (draftPick) =>
-                draftPick.round === pick.round &&
-                draftPick.draftSlot === pick.originalRosterId,
-            ),
-      );
-      const ranked = [...sides].sort((a, b) => b.impact - a.impact);
-      const status: TradeAnalysis["status"] = unresolved
-        ? "pending"
-        : complete.has(season)
-          ? "final"
-          : "provisional";
-      const verdict =
-        status === "pending" || !ranked.length
-          ? "The jury is still out"
-          : ranked.length > 1 && ranked[0].impact - ranked[1].impact <= 5
-            ? "Too close to call"
-            : `${ranked[0].manager} leads the receipt audit`;
-      reports.push({
-        id: transaction.id,
-        season,
-        week: transaction.week,
-        created: transaction.created,
-        sides,
-        verdict,
-        status,
-        hasUnresolvedPicks: unresolved,
-      });
-    }
-  }
-  return reports.sort((a, b) => b.created - a.created);
 }
 
 function longestWinStreak(games: RivalryGame[]) {
@@ -1231,7 +857,6 @@ export function buildFranchises(
   games: RivalryGame[],
   records: RecordEntry[],
   elo: LeagueChaos["elo"],
-  drafts: DraftReport[],
   transactions: Record<string, TransactionFeed>,
   playerFacts: WeeklyPlayerFact[],
 ): FranchiseProfile[] {
@@ -1406,21 +1031,6 @@ export function buildFranchises(
           }
         : null,
       topPerformances: playerHighlights,
-      draftGrades: drafts
-        .map((report) => {
-          const grade = report.teams.find(
-            (team) => team.userId === current.userId,
-          );
-          return grade
-            ? { season: report.season, grade: grade.grade, score: grade.score }
-            : null;
-        })
-        .filter(
-          (
-            grade,
-          ): grade is { season: string; grade: string; score: number } =>
-            Boolean(grade),
-        ),
       tradeCount: relevantSides.filter(
         ({ transaction }) => transaction.type === "trade",
       ).length,
@@ -1596,11 +1206,11 @@ export function buildKeeperCandidates(
             ? "Offseason trade · timer reset to 3 years"
             : tradeTiming === "in-season"
               ? "In-season trade · 2 years left"
-            : acquisitionType === "waiver"
-              ? "Waiver / free agent · Round 8"
-              : draft
-                ? `Drafted Round ${draft.round}`
-                : "Roster carryover",
+              : acquisitionType === "waiver"
+                ? "Waiver / free agent · Round 8"
+                : draft
+                  ? `Drafted Round ${draft.round}`
+                  : "Roster carryover",
       } satisfies KeeperCandidate;
     })
     .filter((candidate): candidate is KeeperCandidate => Boolean(candidate))
@@ -1621,17 +1231,6 @@ export function buildLeagueChaos(input: ChaosInput): LeagueChaos {
     input.seasons,
   );
   const drafts = buildDraftReports(input.seasons, input.playerFacts);
-  const trades = buildTradeAnalyses(
-    input.seasons,
-    input.transactions,
-    input.playerFacts,
-  );
-  const recaps = buildWeeklyRecaps(
-    input.games,
-    input.teamFacts,
-    elo.timeline,
-    records,
-  );
   const superlatives = buildSuperlatives(
     input.games,
     input.teamFacts,
@@ -1644,18 +1243,14 @@ export function buildLeagueChaos(input: ChaosInput): LeagueChaos {
   return {
     schemaVersion: CHAOS_SCHEMA_VERSION,
     archiveReady: input.archiveReady,
-    recaps,
     records,
     elo,
-    drafts,
-    trades,
     superlatives,
     franchises: buildFranchises(
       input.seasons,
       input.games,
       records,
       elo,
-      drafts,
       input.transactions,
       input.playerFacts,
     ),

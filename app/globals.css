@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "./chaos.css";
+@import "./league-extras.css";
 
 :root {
   --ink: #0d1618;

@@ -77,7 +77,7 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews] =
     await Promise.all([
     file("app/lib/chaos.ts"),
-    file("app/components/ChaosExperience.tsx"),
+    file("app/components/LeagueExtras.tsx"),
     file("db/schema.ts"),
     file("app/components/LeagueDashboard.tsx"),
     file("app/history/[view]/page.tsx"),
@@ -88,7 +88,6 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
   assert.match(chaos, /optimalLineupPoints/);
   assert.match(chaos, /buildDraftReports/);
-  assert.match(chaos, /buildTradeAnalyses/);
   assert.match(experience, /The league superlatives/);
   assert.match(experience, /PUBLIC KEEPER LAB/);
   assert.match(schema, /sleeperWeeklyPlayers/);

@@ -32,7 +32,6 @@ function dataForPage(
     ...data,
     chaos: {
       ...chaos,
-      recaps: [],
       records:
         recordBookPage || activePage === "profile"
           ? chaos.records
@@ -41,15 +40,13 @@ function dataForPage(
         eloPage || activePage === "profile"
           ? chaos.elo
           : { standings: [], timeline: [] },
-      drafts: [],
-      trades: [],
       superlatives:
         activePage === "records-superlatives" ? chaos.superlatives : [],
       franchises:
         activePage === "profile"
           ? chaos.franchises.filter(
               (franchise) => franchise.userId === profileUserId,
-            ).map((franchise) => ({ ...franchise, draftGrades: [] }))
+            )
           : [],
       keeperCandidates:
         activePage === "keepers-lab" ? chaos.keeperCandidates : [],

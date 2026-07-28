@@ -18,7 +18,7 @@ import {
   FIRST_ROUND_CONFLICT_MESSAGE,
   hasFirstRoundKeeperConflict,
   projectKeeperCandidate,
-} from "../lib/keeper-candidates";
+} from "../lib/keeper-rules";
 import type { KeeperRecord } from "../lib/keepers";
 import type { Team } from "../lib/sleeper";
 

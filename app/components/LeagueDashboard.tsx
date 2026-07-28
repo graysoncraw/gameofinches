@@ -37,7 +37,7 @@ import {
   KeeperWarRoom,
   LeagueSuperlatives,
   RecordBookExpansion,
-} from "./ChaosExperience";
+} from "./LeagueExtras";
 
 function avatarUrl(avatar: string | null) {
   return avatar ? `https://sleepercdn.com/avatars/thumbs/${avatar}` : null;

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { FIRST_ROUND_CONFLICT_MESSAGE } from "./keeper-candidates";
+import { FIRST_ROUND_CONFLICT_MESSAGE } from "./keeper-rules";
 import { HISTORICAL_KEEPERS, type KeeperSeed } from "./keeper-seed";
 
 export type KeeperRecord = KeeperSeed & {
