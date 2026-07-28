@@ -65,7 +65,7 @@ test("includes the requested league records and keeper labels", async () => {
   assert.match(portal, /Year 3 · final year/);
 });
 
-test("ships the automatic League Chaos archive", async () => {
+test("ships league records, superlatives, profiles, and the public Keeper Lab", async () => {
   const [chaos, experience, schema, dashboard] = await Promise.all([
     file("app/lib/chaos.ts"),
     file("app/components/ChaosExperience.tsx"),
@@ -75,14 +75,17 @@ test("ships the automatic League Chaos archive", async () => {
 
   assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
   assert.match(chaos, /optimalLineupPoints/);
-  assert.match(chaos, /buildWeeklyRecaps/);
   assert.match(chaos, /buildDraftReports/);
   assert.match(chaos, /buildTradeAnalyses/);
-  assert.match(experience, /THE GAME OF INCHES/);
-  assert.match(experience, /The draft report cards/);
-  assert.match(experience, /Trade trees & impact verdicts/);
+  assert.match(experience, /The league superlatives/);
   assert.match(experience, /PUBLIC KEEPER LAB/);
   assert.match(schema, /sleeperWeeklyPlayers/);
   assert.match(schema, /sleeperWeeklyTeams/);
-  assert.match(dashboard, /"chaos", "\/chaos", "Chaos"/);
+  assert.match(dashboard, /LeagueSuperlatives/);
+  assert.doesNotMatch(dashboard, /"chaos", "\/chaos", "Chaos"/);
+  assert.doesNotMatch(dashboard, /DraftReportCards/);
+  assert.doesNotMatch(dashboard, /TradeTrees/);
+  await assert.rejects(
+    access(new URL("../app/chaos/[season]/[week]/page.tsx", import.meta.url)),
+  );
 });

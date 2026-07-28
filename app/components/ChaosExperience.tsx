@@ -376,6 +376,33 @@ export function RecordBookExpansion({ data }: { data: LeagueData }) {
   );
 }
 
+export function LeagueSuperlatives({ data }: { data: LeagueData }) {
+  return (
+    <section className="superlative-section">
+      <div className="section-heading">
+        <div>
+          <span className="section-number">AUTOMATIC DISRESPECT</span>
+          <h2>The league superlatives</h2>
+        </div>
+        <p>Every title is earned by a transparent, deeply unserious formula.</p>
+      </div>
+      <div className="superlative-grid">
+        {data.chaos.superlatives.map((award, index) => (
+          <article key={award.id}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <Award size={22} aria-hidden="true" />
+            <h3>{award.title}</h3>
+            <strong>{award.manager}</strong>
+            <p>{award.teamName}</p>
+            <b>{award.value}</b>
+            <small>{award.explanation}</small>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function DraftReportCards({ data }: { data: LeagueData }) {
   const [season, setSeason] = useState(data.chaos.drafts[0]?.season ?? "");
   const report =
@@ -874,7 +901,7 @@ export function FranchiseDossier({
           <div key={team.season}><span>{team.season}</span><strong>{team.teamName}</strong></div>
         ))}
       </div>
-      <div className="franchise-three-up">
+      <div className="franchise-two-up">
         <article>
           <div className="chaos-panel__title"><Flame size={19} aria-hidden="true" /><div><span>SIGNATURE GAMES</span><strong>Best starter performances</strong></div></div>
           {profile.topPerformances.length ? profile.topPerformances.map((performance) => (
@@ -882,12 +909,6 @@ export function FranchiseDossier({
               <span>{performance.season} W{performance.week}</span><strong>{performance.playerName}</strong><b>{number(performance.points)}</b>
             </div>
           )) : <p className="profile-empty">Player-level archive indexing.</p>}
-        </article>
-        <article>
-          <div className="chaos-panel__title"><Medal size={19} aria-hidden="true" /><div><span>WAR ROOM GRADES</span><strong>Draft history</strong></div></div>
-          {profile.draftGrades.length ? profile.draftGrades.map((grade) => (
-            <div className="profile-list-row" key={grade.season}><span>{grade.season}</span><strong>Grade {grade.grade}</strong><b>{grade.score}</b></div>
-          )) : <p className="profile-empty">Draft grades are indexing.</p>}
         </article>
         <article>
           <div className="chaos-panel__title"><Crown size={19} aria-hidden="true" /><div><span>KEEPER LEGACY</span><strong>Players held close</strong></div></div>

@@ -32,12 +32,10 @@ import type {
 import LeagueRecords from "./LeagueRecords";
 import TransactionHistory from "./TransactionHistory";
 import {
-  ChaosHub,
-  DraftReportCards,
   FranchiseDossier,
   KeeperWarRoom,
+  LeagueSuperlatives,
   RecordBookExpansion,
-  TradeTrees,
 } from "./ChaosExperience";
 
 function avatarUrl(avatar: string | null) {
@@ -173,13 +171,11 @@ export default function LeagueDashboard({
   data,
   keepers,
   activePage = "overview",
-  initialRecap,
   profileUserId,
 }: {
   data: LeagueData;
   keepers: KeeperRecord[];
   activePage?: string;
-  initialRecap?: { season: string; week: number };
   profileUserId?: string;
 }) {
   const current = data.seasons[0];
@@ -266,7 +262,6 @@ export default function LeagueDashboard({
         <div className="nav-links">
           {[
             ["overview", "/", "Overview"],
-            ["chaos", "/chaos", "Chaos"],
             ["teams", "/teams", "Teams"],
             ["history", "/history", "History"],
             ["records", "/records", "Records"],
@@ -400,10 +395,6 @@ export default function LeagueDashboard({
         </div>
       </section>
         </>
-      )}
-
-      {activePage === "chaos" && (
-        <ChaosHub data={data} initialRecap={initialRecap} />
       )}
 
       {activePage === "teams" && (
@@ -626,6 +617,7 @@ export default function LeagueDashboard({
       {activePage === "records" && (
         <>
           <LeagueRecords data={data} />
+          <LeagueSuperlatives data={data} />
           <RecordBookExpansion data={data} />
         </>
       )}
@@ -717,7 +709,6 @@ export default function LeagueDashboard({
           )}
         </div>
       </section>
-      <DraftReportCards data={data} />
         </>
       )}
 
@@ -727,7 +718,6 @@ export default function LeagueDashboard({
         seasons={data.seasons.map((season) => season.year)}
         defaultSeason={latestCompleted?.year ?? current.year}
       />
-      <TradeTrees data={data} />
         </>
       )}
 
