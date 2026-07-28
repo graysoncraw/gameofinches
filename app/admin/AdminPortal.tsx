@@ -11,8 +11,8 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { ChatGPTUser } from "../chatgpt-auth";
 import type { KeeperRecord } from "../lib/keepers";
 import type { Team } from "../lib/sleeper";
 
@@ -59,15 +59,11 @@ export default function AdminPortal({
   seasons,
   teamsBySeason,
   initialKeepers,
-  user,
-  signOutPath,
 }: {
   currentSeason: string;
   seasons: string[];
   teamsBySeason: Record<string, Team[]>;
   initialKeepers: KeeperRecord[];
-  user: ChatGPTUser;
-  signOutPath: string;
 }) {
   const editableSeasons = useMemo(
     () => [...new Set([currentSeason, ...seasons])].sort((a, b) => Number(b) - Number(a)),
@@ -83,6 +79,11 @@ export default function AdminPortal({
   } | null>(null);
 
   const teams = teamsBySeason[season] ?? teamsBySeason[currentSeason] ?? [];
+
+  async function signOut() {
+    await fetch("/api/admin/session", { method: "DELETE" });
+    window.location.reload();
+  }
 
   function keeperFor(rosterId: number, slot: number) {
     return keepers.find(
@@ -220,14 +221,14 @@ export default function AdminPortal({
   return (
     <main className="admin-page">
       <header className="admin-topbar">
-        <a href="/" className="admin-back">
+        <Link href="/" className="admin-back">
           <ArrowLeft size={16} aria-hidden="true" /> League site
-        </a>
+        </Link>
         <div className="admin-identity">
-          <span>Signed in as {user.displayName}</span>
-          <a href={signOutPath}>
+          <span>Commissioner session</span>
+          <button type="button" onClick={signOut}>
             Sign out <LogOut size={14} aria-hidden="true" />
-          </a>
+          </button>
         </div>
       </header>
 
@@ -352,7 +353,7 @@ export default function AdminPortal({
                           </select>
                         </label>
                         <label>
-                          <span>Years left after use</span>
+                          <span>Keeper stage</span>
                           <select
                             value={draft.yearsRemaining}
                             onChange={(event) =>
@@ -361,10 +362,11 @@ export default function AdminPortal({
                               })
                             }
                           >
-                            <option value={3}>3 · reset via trade</option>
-                            <option value={2}>2 · first keeper year</option>
-                            <option value={1}>1 · final year</option>
-                            <option value={0}>0 · expires after season</option>
+                            <option value={3}>
+                              Year 1 · offseason trade · 3 years left
+                            </option>
+                            <option value={2}>Year 2 · 2 years left</option>
+                            <option value={1}>Year 3 · final year</option>
                           </select>
                         </label>
                         <label>

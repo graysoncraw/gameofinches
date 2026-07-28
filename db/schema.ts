@@ -27,3 +27,30 @@ export const keepers = sqliteTable(
     ),
   ],
 );
+
+export const sleeperSnapshots = sqliteTable("sleeper_snapshots", {
+  snapshotKey: text("snapshot_key").primaryKey(),
+  dataJson: text("data_json").notNull(),
+  syncedAt: text("synced_at").notNull(),
+});
+
+export const sleeperSyncRuns = sqliteTable("sleeper_sync_runs", {
+  slotKey: text("slot_key").primaryKey(),
+  status: text("status").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  error: text("error").notNull().default(""),
+});
+
+export const sleeperPlayerCache = sqliteTable("sleeper_player_cache", {
+  cacheKey: text("cache_key").primaryKey(),
+  dataJson: text("data_json").notNull(),
+  fetchedDate: text("fetched_date").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
+  fingerprint: text("fingerprint").primaryKey(),
+  windowStartedAt: integer("window_started_at").notNull(),
+  failures: integer("failures").notNull().default(0),
+  blockedUntil: integer("blocked_until").notNull().default(0),
+});

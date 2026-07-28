@@ -27,6 +27,7 @@ import type {
   Season,
   Team,
 } from "../lib/sleeper";
+import LeagueRecords from "./LeagueRecords";
 import TransactionHistory from "./TransactionHistory";
 
 function avatarUrl(avatar: string | null) {
@@ -249,6 +250,7 @@ export default function LeagueDashboard({
         <div className="nav-links">
           <a href="#franchises">Teams</a>
           <a href="#history">History</a>
+          <a href="#records">Records</a>
           <a href="#drafts">Drafts</a>
           <a href="#transactions">Moves</a>
           <a href="#keepers">Keepers</a>
@@ -349,8 +351,8 @@ export default function LeagueDashboard({
         </div>
         <div>
           <Trophy size={20} aria-hidden="true" />
-          <span>Champions crowned</span>
-          <strong>{data.completedSeasonCount}</strong>
+          <span>Distinct champions</span>
+          <strong>{data.distinctChampionCount}</strong>
         </div>
         <div>
           <DraftingCompass size={20} aria-hidden="true" />
@@ -469,10 +471,12 @@ export default function LeagueDashboard({
         </div>
       </section>
 
+      <LeagueRecords data={data} />
+
       <section className="content-section archive-section">
         <div className="section-heading">
           <div>
-            <span className="section-number">03 / YEAR BY YEAR</span>
+            <span className="section-number">04 / YEAR BY YEAR</span>
             <h2>Season archive</h2>
           </div>
           <label className="select-shell">
@@ -571,7 +575,7 @@ export default function LeagueDashboard({
       <section className="draft-section" id="drafts">
         <div className="section-heading">
           <div>
-            <span className="section-number">04 / DRAFT ROOM</span>
+            <span className="section-number">05 / DRAFT ROOM</span>
             <h2>Every pick. No amnesia.</h2>
           </div>
           <p>
@@ -662,7 +666,7 @@ export default function LeagueDashboard({
       <section className="content-section keeper-section" id="keepers">
         <div className="section-heading">
           <div>
-            <span className="section-number">06 / KEEPER DESK</span>
+            <span className="section-number">07 / KEEPER DESK</span>
             <h2>{keeperYear} keeper board</h2>
           </div>
           <p>
@@ -685,9 +689,9 @@ export default function LeagueDashboard({
             ))}
           </div>
           <div className="keeper-legend">
-            <span><i className="year-three" /> Trade reset</span>
-            <span><i className="year-two" /> First keeper year</span>
-            <span><i className="year-one" /> Final year</span>
+            <span><i className="year-three" /> Year 1 · 3 left</span>
+            <span><i className="year-two" /> Year 2 · 2 left</span>
+            <span><i className="year-one" /> Year 3 · final year</span>
           </div>
         </div>
 

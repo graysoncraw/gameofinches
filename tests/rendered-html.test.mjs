@@ -1,91 +1,66 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
+const file = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-}
-
-test("server-renders the starter loading skeleton", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Building your site/);
-  assert.match(html, /Your site is taking shape/);
-  assert.match(
-    html,
-    /Your first version will appear here automatically when it’s ready\./,
-  );
-  assert.doesNotMatch(html, /Codex/);
-  assert.match(html, /react-loading-skeleton/);
-  assert.match(html, /role="status"/);
-});
-
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
+test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
+  const [sleeper, schema, transactions] = await Promise.all([
+    file("app/lib/sleeper.ts"),
+    file("db/schema.ts"),
+    file("app/api/transactions/route.ts"),
   ]);
 
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
+  assert.match(sleeper, /sleeper_snapshots/);
+  assert.match(sleeper, /sleeper_sync_runs/);
+  assert.match(sleeper, /hour >= 18 \? "18" : "06"/);
+  assert.match(sleeper, /T\$\{window\}:00:00-America\/Chicago/);
+  assert.match(sleeper, /fetched_date === today/);
+  assert.match(sleeper, /if \(cached\) return cached/);
+  assert.match(schema, /sleeperPlayerCache/);
+  assert.match(transactions, /getTransactionFeed/);
+  assert.doesNotMatch(transactions, /api\.sleeper\.app/);
+});
 
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
+test("protects commissioner writes with the shared password session", async () => {
+  const [auth, session, keepers, adminPage] = await Promise.all([
+    file("app/lib/admin-auth.ts"),
+    file("app/api/admin/session/route.ts"),
+    file("app/api/admin/keepers/route.ts"),
+    file("app/admin/page.tsx"),
+  ]);
+
+  assert.match(auth, /COMMISSIONER_PASSWORD_HASH/);
+  assert.match(auth, /COMMISSIONER_SESSION_SECRET/);
+  assert.match(auth, /30 \* 24 \* 60 \* 60/);
+  assert.match(auth, /MAX_LOGIN_FAILURES = 5/);
+  assert.match(session, /httpOnly: true/);
+  assert.match(session, /sameSite: "lax"/);
+  assert.match(keepers, /hasCommissionerRequest/);
+  assert.match(keepers, /isSameOrigin/);
+  assert.match(adminPage, /hasCommissionerSession/);
+  await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
+});
+
+test("includes the requested league records and keeper labels", async () => {
+  const [sleeper, records, dashboard, portal] = await Promise.all([
+    file("app/lib/sleeper.ts"),
+    file("app/components/LeagueRecords.tsx"),
+    file("app/components/LeagueDashboard.tsx"),
+    file("app/admin/AdminPortal.tsx"),
+  ]);
+
+  assert.match(sleeper, /"2023": \{ buyIn: 10, first: 100/);
+  assert.match(sleeper, /"2025": \{ buyIn: 15, first: 150/);
+  assert.match(
+    sleeper,
+    /"2026": \{ buyIn: 25, first: 175, second: 50, third: 25 \}/,
   );
-
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
-  );
+  assert.match(records, /League money ledger/);
+  assert.match(records, /Choose your enemies/);
+  assert.match(records, /TOP 10 STARTER SCORES/);
+  assert.match(dashboard, /Distinct champions/);
+  assert.match(dashboard, /Year 1 · 3 left/);
+  assert.match(portal, /Year 1 · offseason trade · 3 years left/);
+  assert.match(portal, /Year 3 · final year/);
 });

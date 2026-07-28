@@ -16,7 +16,7 @@ export type KeeperSeed = {
 type SeedRow = Omit<KeeperSeed, "slot" | "position" | "nflTeam" | "notes">;
 
 const rawKeepers: SeedRow[] = [
-  // 2024 — green on the spreadsheet draft board (first keeper season).
+  // 2024 — green on the sheet: Year 2, two eligible seasons left.
   { season: "2024", rosterId: 10, managerName: "Cam Morrison", teamName: "It's Always Sunny", playerName: "Christian McCaffrey", costRound: 1, yearsRemaining: 2, acquisitionType: "draft" },
   { season: "2024", rosterId: 10, managerName: "Cam Morrison", teamName: "It's Always Sunny", playerName: "Amon-Ra St. Brown", costRound: 2, yearsRemaining: 2, acquisitionType: "draft" },
   { season: "2024", rosterId: 5, managerName: "Jeff Crawford", teamName: "Mighty Fighting Crawfish", playerName: "Tyreek Hill", costRound: 1, yearsRemaining: 2, acquisitionType: "draft" },
@@ -38,7 +38,7 @@ const rawKeepers: SeedRow[] = [
   { season: "2024", rosterId: 9, managerName: "Cray Cothran", teamName: "Dak Attack", playerName: "Cole Kmet", costRound: 9, yearsRemaining: 2, acquisitionType: "draft" },
   { season: "2024", rosterId: 9, managerName: "Cray Cothran", teamName: "Dak Attack", playerName: "Zay Flowers", costRound: 10, yearsRemaining: 2, acquisitionType: "draft" },
 
-  // 2025 — green = first season, red = repeat/final season.
+  // 2025 — green = Year 2/two left; red = Year 3/final year.
   { season: "2025", rosterId: 7, managerName: "Matt Redfield", teamName: "Here Comes McBride", playerName: "Saquon Barkley", costRound: 1, yearsRemaining: 2, acquisitionType: "draft" },
   { season: "2025", rosterId: 7, managerName: "Matt Redfield", teamName: "Here Comes McBride", playerName: "Trey McBride", costRound: 7, yearsRemaining: 1, acquisitionType: "draft" },
   { season: "2025", rosterId: 3, managerName: "Ben Fowler", teamName: "Arkansas Dangermen", playerName: "Josh Allen", costRound: 1, yearsRemaining: 2, acquisitionType: "draft" },

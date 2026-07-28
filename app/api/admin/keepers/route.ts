@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getChatGPTUser } from "../../../chatgpt-auth";
-import { isCommissioner } from "../../../lib/admin-auth";
+import {
+  hasCommissionerRequest,
+  isSameOrigin,
+} from "../../../lib/admin-auth";
 import {
   deleteKeeper,
   getKeeperRecords,
@@ -72,19 +74,20 @@ function validateKeeper(value: unknown): KeeperWrite {
   };
 }
 
-export async function GET() {
-  const user = await getChatGPTUser();
-  if (!isCommissioner(user)) return unauthorized();
+export async function GET(request: Request) {
+  if (!(await hasCommissionerRequest(request))) return unauthorized();
   return NextResponse.json({ keepers: await getKeeperRecords() });
 }
 
 export async function POST(request: Request) {
-  const user = await getChatGPTUser();
-  if (!isCommissioner(user)) return unauthorized();
+  if (!(await hasCommissionerRequest(request))) return unauthorized();
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
 
   try {
     const keeper = validateKeeper(await request.json());
-    const saved = await saveKeeper(keeper, user?.email ?? "commissioner");
+    const saved = await saveKeeper(keeper, "Commissioner");
     return NextResponse.json({ keeper: saved });
   } catch (error) {
     return NextResponse.json(
@@ -98,8 +101,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const user = await getChatGPTUser();
-  if (!isCommissioner(user)) return unauthorized();
+  if (!(await hasCommissionerRequest(request))) return unauthorized();
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
 
   const url = new URL(request.url);
   const season = url.searchParams.get("season") ?? "";

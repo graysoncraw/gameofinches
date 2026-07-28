@@ -43,10 +43,13 @@ export default function TransactionHistory({
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
-    setVisible(20);
-    setFilter("all");
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError("");
+      setVisible(20);
+      setFilter("all");
+    });
     fetch(`/api/transactions?season=${season}`)
       .then(async (response) => {
         const payload = (await response.json()) as TransactionFeed & {
@@ -90,7 +93,7 @@ export default function TransactionHistory({
     <section className="transaction-section" id="transactions">
       <div className="section-heading light">
         <div>
-          <span className="section-number">05 / LEAGUE WIRE</span>
+          <span className="section-number">06 / LEAGUE WIRE</span>
           <h2>Every move leaves a trail.</h2>
         </div>
         <p>

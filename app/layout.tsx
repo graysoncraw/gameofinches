@@ -26,11 +26,11 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: baseUrl,
     title: "Game of Inches | Fantasy Football League",
     description:
-      "The living archive for Game of Inches — champions, standings, draft results, manual keeper history, transactions, and all-time records since 2023.",
+      "The living Game of Inches archive — champions, finances, rivalries, top performances, drafts, transactions, and keeper history since 2023.",
     openGraph: {
       title: "Game of Inches",
       description:
-        "Every inch counts. Drafts, keepers, transactions, and league history.",
+        "Every inch counts. Titles, money, rivalries, drafts, keepers, and league history.",
       type: "website",
       images: [{ url: imageUrl, width: 1536, height: 1024 }],
     },
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title: "Game of Inches",
       description:
-        "Every inch counts. Drafts, keepers, transactions, and league history.",
+        "Every inch counts. Titles, money, rivalries, drafts, keepers, and league history.",
       images: [imageUrl],
     },
   };
