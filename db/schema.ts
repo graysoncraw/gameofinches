@@ -1,16 +1,22 @@
 import {
+  bigint,
+  boolean,
+  date,
+  doublePrecision,
   integer,
+  jsonb,
+  pgTable,
   primaryKey,
-  real,
-  sqliteTable,
+  serial,
   text,
+  timestamp,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
-export const keepers = sqliteTable(
+export const keepers = pgTable(
   "keepers",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     season: text("season").notNull(),
     rosterId: integer("roster_id").notNull(),
     slot: integer("slot").notNull(),
@@ -24,7 +30,10 @@ export const keepers = sqliteTable(
     acquisitionType: text("acquisition_type").notNull().default("draft"),
     notes: text("notes").notNull().default(""),
     updatedBy: text("updated_by").notNull().default("sheet-import"),
-    updatedAt: text("updated_at").notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
   },
   (table) => [
     uniqueIndex("keepers_season_roster_slot_idx").on(
@@ -35,34 +44,45 @@ export const keepers = sqliteTable(
   ],
 );
 
-export const sleeperSnapshots = sqliteTable("sleeper_snapshots", {
+export const sleeperSnapshots = pgTable("sleeper_snapshots", {
   snapshotKey: text("snapshot_key").primaryKey(),
-  dataJson: text("data_json").notNull(),
-  syncedAt: text("synced_at").notNull(),
+  dataJson: jsonb("data_json").notNull(),
+  syncedAt: timestamp("synced_at", {
+    withTimezone: true,
+    mode: "string",
+  }).notNull(),
 });
 
-export const sleeperSyncRuns = sqliteTable("sleeper_sync_runs", {
+export const sleeperSyncRuns = pgTable("sleeper_sync_runs", {
   slotKey: text("slot_key").primaryKey(),
   status: text("status").notNull(),
-  updatedAt: text("updated_at").notNull(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "string",
+  }).notNull(),
   error: text("error").notNull().default(""),
 });
 
-export const sleeperPlayerCache = sqliteTable("sleeper_player_cache", {
+export const sleeperPlayerCache = pgTable("sleeper_player_cache", {
   cacheKey: text("cache_key").primaryKey(),
-  dataJson: text("data_json").notNull(),
-  fetchedDate: text("fetched_date").notNull(),
-  updatedAt: text("updated_at").notNull(),
+  dataJson: jsonb("data_json").notNull(),
+  fetchedDate: date("fetched_date", { mode: "string" }).notNull(),
+  updatedAt: timestamp("updated_at", {
+    withTimezone: true,
+    mode: "string",
+  }).notNull(),
 });
 
-export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
+export const adminLoginAttempts = pgTable("admin_login_attempts", {
   fingerprint: text("fingerprint").primaryKey(),
-  windowStartedAt: integer("window_started_at").notNull(),
+  windowStartedAt: bigint("window_started_at", { mode: "number" }).notNull(),
   failures: integer("failures").notNull().default(0),
-  blockedUntil: integer("blocked_until").notNull().default(0),
+  blockedUntil: bigint("blocked_until", { mode: "number" })
+    .notNull()
+    .default(0),
 });
 
-export const sleeperWeeklyTeams = sqliteTable(
+export const sleeperWeeklyTeams = pgTable(
   "sleeper_weekly_teams",
   {
     season: text("season").notNull(),
@@ -74,9 +94,9 @@ export const sleeperWeeklyTeams = sqliteTable(
     matchupId: integer("matchup_id").notNull(),
     opponentRosterId: integer("opponent_roster_id").notNull(),
     opponentId: text("opponent_id").notNull(),
-    points: real("points").notNull(),
-    optimalPoints: real("optimal_points").notNull(),
-    postseason: integer("postseason", { mode: "boolean" }).notNull(),
+    points: doublePrecision("points").notNull(),
+    optimalPoints: doublePrecision("optimal_points").notNull(),
+    postseason: boolean("postseason").notNull(),
     result: text("result").notNull(),
   },
   (table) => [
@@ -84,7 +104,7 @@ export const sleeperWeeklyTeams = sqliteTable(
   ],
 );
 
-export const sleeperWeeklyPlayers = sqliteTable(
+export const sleeperWeeklyPlayers = pgTable(
   "sleeper_weekly_players",
   {
     season: text("season").notNull(),
@@ -95,8 +115,8 @@ export const sleeperWeeklyPlayers = sqliteTable(
     playerName: text("player_name").notNull(),
     position: text("position").notNull(),
     nflTeam: text("nfl_team").notNull(),
-    points: real("points").notNull(),
-    starter: integer("starter", { mode: "boolean" }).notNull(),
+    points: doublePrecision("points").notNull(),
+    starter: boolean("starter").notNull(),
   },
   (table) => [
     primaryKey({

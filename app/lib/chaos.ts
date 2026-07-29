@@ -1065,7 +1065,7 @@ export function buildFranchises(
                 }
               : null;
           })
-          .find((record): record is RecordEntry => Boolean(record)) ?? null,
+          .find((record) => record !== null) ?? null,
       bestSeason: bestSeason
         ? {
             season: bestSeason.season.year,

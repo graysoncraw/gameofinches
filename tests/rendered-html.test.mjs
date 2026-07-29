@@ -4,10 +4,14 @@ import test from "node:test";
 
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
-  const [sleeper, schema, transactions] = await Promise.all([
+test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
+  const [sleeper, schema, database, compose, dockerfile, transactions] =
+    await Promise.all([
     file("app/lib/sleeper.ts"),
     file("db/schema.ts"),
+    file("db/index.ts"),
+    file("compose.yaml"),
+    file("Dockerfile"),
     file("app/api/transactions/route.ts"),
   ]);
 
@@ -18,9 +22,20 @@ test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
   assert.match(sleeper, /fetched_date === today/);
   assert.match(sleeper, /if \(cached\) return cached/);
   assert.match(sleeper, /losers_bracket/);
+  assert.match(sleeper, /\?::jsonb/);
   assert.match(schema, /sleeperPlayerCache/);
+  assert.match(schema, /pgTable/);
+  assert.match(schema, /jsonb/);
+  assert.match(database, /postgres/);
+  assert.match(database, /DATABASE_URL/);
+  assert.match(compose, /postgres:17-alpine/);
+  assert.match(compose, /condition: service_healthy/);
+  assert.match(dockerfile, /\.next\/standalone/);
+  assert.match(dockerfile, /scripts\/migrate\.mjs/);
   assert.match(transactions, /getTransactionFeed/);
   assert.doesNotMatch(transactions, /api\.sleeper\.app/);
+  assert.doesNotMatch(sleeper, /cloudflare:workers|D1Database/);
+  assert.doesNotMatch(database, /drizzle-orm\/d1/);
 });
 
 test("protects commissioner writes with the shared password session", async () => {

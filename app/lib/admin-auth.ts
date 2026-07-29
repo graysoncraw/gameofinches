@@ -1,5 +1,5 @@
-import { env } from "cloudflare:workers";
 import { cookies } from "next/headers";
+import { getDatabase } from "../../db";
 
 export const COMMISSIONER_COOKIE = "goi_commissioner";
 export const COMMISSIONER_SESSION_SECONDS = 30 * 24 * 60 * 60;
@@ -9,15 +9,7 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_FAILURES = 5;
 
 function environmentValue(key: string) {
-  try {
-    return (
-      (env as unknown as Record<string, string | undefined>)[key] ??
-      process.env[key] ??
-      ""
-    );
-  } catch {
-    return process.env[key] ?? "";
-  }
+  return process.env[key] ?? "";
 }
 
 function sessionSecret() {
@@ -27,14 +19,6 @@ function sessionSecret() {
     throw new Error("Commissioner session security is not configured.");
   }
   return "game-of-inches-local-session-secret";
-}
-
-function getD1(): D1Database | null {
-  try {
-    return (env as unknown as { DB?: D1Database }).DB ?? null;
-  } catch {
-    return null;
-  }
 }
 
 function bytesToHex(bytes: ArrayBuffer) {
@@ -115,24 +99,6 @@ export async function hasCommissionerRequest(request: Request) {
   return verifyCommissionerSession(cookieFromRequest(request));
 }
 
-export function isSameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  return Boolean(origin && origin === new URL(request.url).origin);
-}
-
-async function ensureAttemptSchema(db: D1Database) {
-  await db
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS admin_login_attempts (
-        fingerprint TEXT PRIMARY KEY,
-        window_started_at INTEGER NOT NULL,
-        failures INTEGER NOT NULL DEFAULT 0,
-        blocked_until INTEGER NOT NULL DEFAULT 0
-      )`,
-    )
-    .run();
-}
-
 async function fingerprint(request: Request) {
   const ip =
     request.headers.get("cf-connecting-ip") ||
@@ -142,18 +108,17 @@ async function fingerprint(request: Request) {
 }
 
 export async function loginRateLimit(request: Request) {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) return { blocked: false, retryAfter: 0 };
-  await ensureAttemptSchema(db);
   const row = await db
     .prepare(
       `SELECT blocked_until FROM admin_login_attempts WHERE fingerprint = ?`,
     )
     .bind(await fingerprint(request))
-    .first<{ blocked_until: number }>();
+    .first<{ blocked_until: number | string }>();
   const retryAfter = Math.max(
     0,
-    Math.ceil(((row?.blocked_until ?? 0) - Date.now()) / 1000),
+    Math.ceil((Number(row?.blocked_until ?? 0) - Date.now()) / 1000),
   );
   return { blocked: retryAfter > 0, retryAfter };
 }
@@ -162,9 +127,8 @@ export async function recordLoginAttempt(
   request: Request,
   succeeded: boolean,
 ) {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) return;
-  await ensureAttemptSchema(db);
   const key = await fingerprint(request);
   if (succeeded) {
     await db
@@ -181,10 +145,11 @@ export async function recordLoginAttempt(
        FROM admin_login_attempts WHERE fingerprint = ?`,
     )
     .bind(key)
-    .first<{ window_started_at: number; failures: number }>();
-  const inWindow = row && now - row.window_started_at < LOGIN_WINDOW_MS;
+    .first<{ window_started_at: number | string; failures: number }>();
+  const priorWindowStartedAt = Number(row?.window_started_at ?? 0);
+  const inWindow = row && now - priorWindowStartedAt < LOGIN_WINDOW_MS;
   const failures = inWindow ? row.failures + 1 : 1;
-  const windowStartedAt = inWindow ? row.window_started_at : now;
+  const windowStartedAt = inWindow ? priorWindowStartedAt : now;
   const blockedUntil =
     failures >= MAX_LOGIN_FAILURES ? now + LOGIN_WINDOW_MS : 0;
 

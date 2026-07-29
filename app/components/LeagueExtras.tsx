@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-html-link-for-pages -- vinext duplicates React when next/link is used in this client tree. */
+/* eslint-disable @next/next/no-html-link-for-pages -- navigation intentionally uses full-page links. */
 
 import {
   ArrowLeft,

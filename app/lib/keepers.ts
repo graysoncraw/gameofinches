@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { getDatabase, type PostgresDatabase } from "../../db";
 import { FIRST_ROUND_CONFLICT_MESSAGE } from "./keeper-rules";
 import { HISTORICAL_KEEPERS, type KeeperSeed } from "./keeper-seed";
 
@@ -12,72 +12,47 @@ export type KeeperWrite = Omit<KeeperSeed, "notes"> & {
   notes?: string;
 };
 
-function getD1(): D1Database | null {
-  try {
-    return (env as unknown as { DB?: D1Database }).DB ?? null;
-  } catch {
-    return null;
-  }
-}
+let keeperSeedPromise: Promise<void> | null = null;
 
-async function ensureKeeperSchema(db: D1Database) {
-  await db.batch([
-    db
-      .prepare(
-        `CREATE TABLE IF NOT EXISTS keepers (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          season TEXT NOT NULL,
-          roster_id INTEGER NOT NULL,
-          slot INTEGER NOT NULL,
-          manager_name TEXT NOT NULL,
-          team_name TEXT NOT NULL,
-          player_name TEXT NOT NULL,
-          position TEXT NOT NULL DEFAULT '',
-          nfl_team TEXT NOT NULL DEFAULT '',
-          cost_round INTEGER NOT NULL,
-          years_remaining INTEGER NOT NULL,
-          acquisition_type TEXT NOT NULL DEFAULT 'draft',
-          notes TEXT NOT NULL DEFAULT '',
-          updated_by TEXT NOT NULL DEFAULT 'sheet-import',
-          updated_at TEXT NOT NULL,
-          UNIQUE(season, roster_id, slot)
-        )`,
-      ),
-    db
-      .prepare(
-        "CREATE INDEX IF NOT EXISTS keepers_season_idx ON keepers (season)",
-      ),
-  ]);
-
+async function ensureKeeperSeed(db: PostgresDatabase) {
+  if (keeperSeedPromise) return keeperSeedPromise;
   const now = new Date().toISOString();
-  await db.batch(
-    HISTORICAL_KEEPERS.map((keeper) =>
-      db
-        .prepare(
-          `INSERT OR IGNORE INTO keepers (
-            season, roster_id, slot, manager_name, team_name, player_name,
-            position, nfl_team, cost_round, years_remaining, acquisition_type,
-            notes, updated_by, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          keeper.season,
-          keeper.rosterId,
-          keeper.slot,
-          keeper.managerName,
-          keeper.teamName,
-          keeper.playerName,
-          keeper.position,
-          keeper.nflTeam,
-          keeper.costRound,
-          keeper.yearsRemaining,
-          keeper.acquisitionType,
-          keeper.notes,
-          "sheet-import",
-          now,
-        ),
-    ),
-  );
+  keeperSeedPromise = db
+    .batch(
+      HISTORICAL_KEEPERS.map((keeper) =>
+        db
+          .prepare(
+            `INSERT INTO keepers (
+              season, roster_id, slot, manager_name, team_name, player_name,
+              position, nfl_team, cost_round, years_remaining, acquisition_type,
+              notes, updated_by, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (season, roster_id, slot) DO NOTHING`,
+          )
+          .bind(
+            keeper.season,
+            keeper.rosterId,
+            keeper.slot,
+            keeper.managerName,
+            keeper.teamName,
+            keeper.playerName,
+            keeper.position,
+            keeper.nflTeam,
+            keeper.costRound,
+            keeper.yearsRemaining,
+            keeper.acquisitionType,
+            keeper.notes,
+            "sheet-import",
+            now,
+          ),
+      ),
+    )
+    .then(() => undefined)
+    .catch((error) => {
+      keeperSeedPromise = null;
+      throw error;
+    });
+  return keeperSeedPromise;
 }
 
 function mapRow(row: Record<string, unknown>): KeeperRecord {
@@ -103,10 +78,10 @@ function mapRow(row: Record<string, unknown>): KeeperRecord {
 }
 
 export async function getKeeperRecords(): Promise<KeeperRecord[]> {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) return HISTORICAL_KEEPERS;
 
-  await ensureKeeperSchema(db);
+  await ensureKeeperSeed(db);
   const results = await db
     .prepare(
       `SELECT * FROM keepers
@@ -121,9 +96,9 @@ export async function saveKeeper(
   keeper: KeeperWrite,
   updatedBy: string,
 ): Promise<KeeperRecord> {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) throw new Error("Keeper storage is unavailable.");
-  await ensureKeeperSchema(db);
+  await ensureKeeperSeed(db);
 
   if (keeper.costRound === 1) {
     const conflict = await db
@@ -192,9 +167,9 @@ export async function deleteKeeper(
   rosterId: number,
   slot: number,
 ) {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) throw new Error("Keeper storage is unavailable.");
-  await ensureKeeperSchema(db);
+  await ensureKeeperSeed(db);
   await db
     .prepare(
       "DELETE FROM keepers WHERE season = ? AND roster_id = ? AND slot = ?",

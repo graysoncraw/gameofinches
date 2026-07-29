@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { getDatabase, type PostgresDatabase } from "../../db";
 import {
   buildLeagueChaos,
   CHAOS_SCHEMA_VERSION,
@@ -401,83 +401,6 @@ async function sleeperFetch<T>(path: string): Promise<T> {
   }
 }
 
-function getD1(): D1Database | null {
-  try {
-    return (env as unknown as { DB?: D1Database }).DB ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function ensureSnapshotSchema(db: D1Database) {
-  await db.batch([
-    db.prepare(
-      `CREATE TABLE IF NOT EXISTS sleeper_snapshots (
-        snapshot_key TEXT PRIMARY KEY,
-        data_json TEXT NOT NULL,
-        synced_at TEXT NOT NULL
-      )`,
-    ),
-    db.prepare(
-      `CREATE TABLE IF NOT EXISTS sleeper_sync_runs (
-        slot_key TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        error TEXT NOT NULL DEFAULT ''
-      )`,
-    ),
-    db.prepare(
-      `CREATE TABLE IF NOT EXISTS sleeper_player_cache (
-        cache_key TEXT PRIMARY KEY,
-        data_json TEXT NOT NULL,
-        fetched_date TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )`,
-    ),
-    db.prepare(
-      `CREATE TABLE IF NOT EXISTS sleeper_weekly_teams (
-        season TEXT NOT NULL,
-        week INTEGER NOT NULL,
-        roster_id INTEGER NOT NULL,
-        user_id TEXT NOT NULL,
-        manager TEXT NOT NULL,
-        team_name TEXT NOT NULL,
-        matchup_id INTEGER NOT NULL,
-        opponent_roster_id INTEGER NOT NULL,
-        opponent_id TEXT NOT NULL,
-        points REAL NOT NULL,
-        optimal_points REAL NOT NULL,
-        postseason INTEGER NOT NULL,
-        result TEXT NOT NULL,
-        PRIMARY KEY (season, week, roster_id)
-      )`,
-    ),
-    db.prepare(
-      `CREATE TABLE IF NOT EXISTS sleeper_weekly_players (
-        season TEXT NOT NULL,
-        week INTEGER NOT NULL,
-        roster_id INTEGER NOT NULL,
-        user_id TEXT NOT NULL,
-        player_id TEXT NOT NULL,
-        player_name TEXT NOT NULL,
-        position TEXT NOT NULL,
-        nfl_team TEXT NOT NULL,
-        points REAL NOT NULL,
-        starter INTEGER NOT NULL,
-        PRIMARY KEY (season, week, roster_id, player_id)
-      )`,
-    ),
-    db.prepare(
-      `CREATE INDEX IF NOT EXISTS sleeper_weekly_players_owner_idx
-       ON sleeper_weekly_players (user_id, season, week)`,
-    ),
-    db.prepare(
-      `CREATE INDEX IF NOT EXISTS sleeper_weekly_players_player_idx
-       ON sleeper_weekly_players (player_id, season, week)`,
-    ),
-  ]);
-}
-
 function chicagoParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Chicago",
@@ -519,15 +442,21 @@ function chicagoDate(date = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-async function readSnapshot(db: D1Database): Promise<LeagueSnapshot | null> {
+function storedJson<T>(value: string | T): T {
+  return typeof value === "string" ? (JSON.parse(value) as T) : value;
+}
+
+async function readSnapshot(
+  db: PostgresDatabase,
+): Promise<LeagueSnapshot | null> {
   const row = await db
     .prepare("SELECT data_json FROM sleeper_snapshots WHERE snapshot_key = ?")
     .bind(SNAPSHOT_KEY)
-    .first<{ data_json: string }>();
-  return row ? (JSON.parse(row.data_json) as LeagueSnapshot) : null;
+    .first<{ data_json: LeagueSnapshot | string }>();
+  return row ? storedJson<LeagueSnapshot>(row.data_json) : null;
 }
 
-async function waitForInitialSnapshot(db: D1Database) {
+async function waitForInitialSnapshot(db: PostgresDatabase) {
   for (let attempt = 0; attempt < 90; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, 500));
     const snapshot = await readSnapshot(db);
@@ -536,12 +465,13 @@ async function waitForInitialSnapshot(db: D1Database) {
   return null;
 }
 
-async function claimSync(db: D1Database, slot: string) {
+async function claimSync(db: PostgresDatabase, slot: string) {
   const now = new Date().toISOString();
   const inserted = await db
     .prepare(
-      `INSERT OR IGNORE INTO sleeper_sync_runs
-       (slot_key, status, updated_at, error) VALUES (?, 'running', ?, '')`,
+      `INSERT INTO sleeper_sync_runs
+       (slot_key, status, updated_at, error) VALUES (?, 'running', ?, '')
+       ON CONFLICT (slot_key) DO NOTHING`,
     )
     .bind(slot, now)
     .run();
@@ -560,7 +490,7 @@ async function claimSync(db: D1Database, slot: string) {
 }
 
 async function finishSync(
-  db: D1Database,
+  db: PostgresDatabase,
   slot: string,
   status: "success" | "failed",
   error = "",
@@ -575,7 +505,7 @@ async function finishSync(
 }
 
 async function persistFacts(
-  db: D1Database,
+  db: PostgresDatabase,
   facts: LeagueSnapshot["facts"],
   seasons: string[],
 ) {
@@ -613,7 +543,7 @@ async function persistFacts(
           fact.opponentId,
           fact.points,
           fact.optimalPoints,
-          fact.postseason ? 1 : 0,
+          fact.postseason,
           fact.result,
         ),
     );
@@ -637,7 +567,7 @@ async function persistFacts(
           fact.position,
           fact.nflTeam,
           fact.points,
-          fact.starter ? 1 : 0,
+          fact.starter,
         ),
     );
   for (let index = 0; index < teamStatements.length; index += 75) {
@@ -648,17 +578,21 @@ async function persistFacts(
   }
 }
 
-async function loadPlayers(db: D1Database | null) {
+async function loadPlayers(db: PostgresDatabase | null) {
   const today = chicagoDate();
   if (db) {
     const cached = await db
       .prepare(
-        `SELECT data_json, fetched_date FROM sleeper_player_cache
+        `SELECT data_json, fetched_date::text AS fetched_date
+         FROM sleeper_player_cache
          WHERE cache_key = 'nfl'`,
       )
-      .first<{ data_json: string; fetched_date: string }>();
+      .first<{
+        data_json: Record<string, PlayerLabel> | string;
+        fetched_date: string;
+      }>();
     if (cached?.fetched_date === today) {
-      return JSON.parse(cached.data_json) as Record<string, PlayerLabel>;
+      return storedJson<Record<string, PlayerLabel>>(cached.data_json);
     }
   }
 
@@ -681,7 +615,7 @@ async function loadPlayers(db: D1Database | null) {
       .prepare(
         `INSERT INTO sleeper_player_cache
          (cache_key, data_json, fetched_date, updated_at)
-         VALUES ('nfl', ?, ?, ?)
+         VALUES ('nfl', ?::jsonb, ?, ?)
          ON CONFLICT(cache_key) DO UPDATE SET
            data_json = excluded.data_json,
            fetched_date = excluded.fetched_date,
@@ -1341,7 +1275,7 @@ async function loadTransactionFeed(
 
 async function buildSnapshot(
   previous: LeagueSnapshot | null,
-  db: D1Database | null,
+  db: PostgresDatabase | null,
 ): Promise<LeagueSnapshot> {
   const players = await loadPlayers(db);
   const currentLeague =
@@ -1479,9 +1413,8 @@ async function buildSnapshot(
 }
 
 async function getSnapshot(): Promise<LeagueSnapshot> {
-  const db = getD1();
+  const db = getDatabase();
   if (!db) return buildSnapshot(null, null);
-  await ensureSnapshotSchema(db);
   const cached = await readSnapshot(db);
   const slot = syncSlot();
   const claimed = await claimSync(db, slot);
@@ -1507,7 +1440,7 @@ async function getSnapshot(): Promise<LeagueSnapshot> {
     await db
       .prepare(
         `INSERT INTO sleeper_snapshots (snapshot_key, data_json, synced_at)
-         VALUES (?, ?, ?)
+         VALUES (?, ?::jsonb, ?)
          ON CONFLICT(snapshot_key) DO UPDATE SET
            data_json = excluded.data_json,
            synced_at = excluded.synced_at`,

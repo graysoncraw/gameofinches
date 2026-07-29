@@ -15,8 +15,11 @@
 
 # next.js
 /.next/
-/.vinext/
 /out/
+
+# obsolete local build state from the pre-Docker runtime
+/.vinext/
+/.wrangler/
 
 # misc
 .DS_Store
@@ -39,6 +42,6 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 /dist/
-/.wrangler/
 /outputs/
 /work/
+/backups/
