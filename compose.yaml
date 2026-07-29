@@ -2,6 +2,7 @@ name: game-of-inches
 
 services:
   database:
+    container_name: goi-postgres
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
