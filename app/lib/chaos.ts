@@ -6,7 +6,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 6;
+export const CHAOS_SCHEMA_VERSION = 7;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -757,6 +757,7 @@ export function buildSuperlatives(
     }
   }
   const heartbreak = new Map<string, number>();
+  const nailBiters = new Map<string, { wins: number; margin: number }>();
   for (const game of completedGames(games)) {
     if (game.pointsA < game.pointsB) {
       heartbreak.set(
@@ -769,21 +770,25 @@ export function buildSuperlatives(
         (heartbreak.get(game.managerBId) ?? 0) + game.pointsB,
       );
     }
-  }
-  const lineup = new Map<string, { gap: number; games: number }>();
-  for (const fact of teamFacts) {
-    const row = lineup.get(fact.userId) ?? { gap: 0, games: 0 };
-    row.gap += Math.max(0, fact.optimalPoints - fact.points);
-    row.games += 1;
-    lineup.set(fact.userId, row);
+    const margin = Math.abs(game.pointsA - game.pointsB);
+    if (game.winnerId && margin <= 5) {
+      const row = nailBiters.get(game.winnerId) ?? { wins: 0, margin: 0 };
+      row.wins += 1;
+      row.margin += margin;
+      nailBiters.set(game.winnerId, row);
+    }
   }
   const streaks = longestWinStreak(games);
   const highest = (map: Map<string, number>) =>
     [...map.entries()].sort((a, b) => b[1] - a[1])[0];
-  const lowestLineup = [...lineup.entries()]
-    .filter(([, value]) => value.games >= 4)
-    .map(([id, value]) => [id, value.gap / value.games] as const)
-    .sort((a, b) => a[1] - b[1])[0];
+  const nailBiterLeader = [...nailBiters.entries()]
+    .sort(
+      ([userA, rowA], [userB, rowB]) =>
+        rowB.wins - rowA.wins ||
+        rowA.margin / rowA.wins - rowB.margin / rowB.wins ||
+        userA.localeCompare(userB),
+    )
+    .map(([userId, row]) => [userId, row.wins] as [string, number])[0];
   const factsByWeek = new Map<string, WeeklyTeamFact[]>();
   for (const fact of teamFacts) {
     const key = `${fact.season}:${fact.week}`;
@@ -845,7 +850,13 @@ export function buildSuperlatives(
   add("faab-arsonist", "FAAB Arsonist", highest(faab), (v) => `$${v}`, "Most FAAB committed to successful claims.");
   add("trade-addict", "Trade Addict", highest(tradeCounts), (v) => `${v} trades`, "Most appearances on completed trade receipts.");
   add("heartbreak", "Heartbreak Leader", highest(heartbreak), (v) => `${rounded(v)} pts`, "Most total points scored in losses.");
-  add("lineup-wizard", "Lineup Wizard", lowestLineup, (v) => `${rounded(v)} avg gap`, "Smallest average gap between actual and optimal lineups.");
+  add(
+    "nail-biter-king",
+    "Nail-Biter King",
+    nailBiterLeader,
+    (v) => `${v} close ${v === 1 ? "win" : "wins"}`,
+    "Most wins by five points or fewer; ties break by smallest average winning margin.",
+  );
   add("streaker", "The Streaker", highest(streaks), (v) => `${v} straight`, "Longest winning streak in the archive.");
   add(
     "scoreboard-bully",

@@ -272,6 +272,49 @@ test("Scoreboard Bully counts tied weekly highs and excludes zero weeks", () => 
   assert.equal(pointsTiebreakAward?.manager, "Bravo");
 });
 
+test("Nail-Biter King counts wins by five points or fewer", () => {
+  const closeGames: RivalryGame[] = [
+    { ...game, week: 1, pointsA: 114, pointsB: 110, winnerId: "a" },
+    { ...game, week: 2, pointsA: 107, pointsB: 110, winnerId: "b" },
+    {
+      ...game,
+      week: 3,
+      postseason: true,
+      pointsA: 112,
+      pointsB: 110,
+      winnerId: "a",
+    },
+    { ...game, week: 4, pointsA: 116, pointsB: 110, winnerId: "a" },
+    { ...game, week: 5, pointsA: 0, pointsB: 0, winnerId: null },
+  ];
+  const teams = new Map([
+    ["a", teamA],
+    ["b", teamB],
+  ]);
+  const award = buildSuperlatives(
+    closeGames,
+    [],
+    [],
+    {},
+    [],
+    teams,
+  ).find((item) => item.id === "nail-biter-king");
+
+  assert.equal(award?.manager, "Alpha");
+  assert.equal(award?.value, "2 close wins");
+
+  const tiebreakAward = buildSuperlatives(
+    closeGames.slice(0, 2),
+    [],
+    [],
+    {},
+    [],
+    teams,
+  ).find((item) => item.id === "nail-biter-king");
+
+  assert.equal(tiebreakAward?.manager, "Bravo");
+});
+
 test("draft grades exclude keeper picks and remain transparent", () => {
   const facts: WeeklyPlayerFact[] = [
     {

@@ -90,7 +90,10 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(chaos, /buildDraftReports/);
   assert.match(chaos, /Scoreboard Bully/);
   assert.match(chaos, /scoreboard-bully/);
+  assert.match(chaos, /Nail-Biter King/);
+  assert.match(chaos, /nail-biter-king/);
   assert.doesNotMatch(chaos, /Draft Thief|draft-thief/);
+  assert.doesNotMatch(chaos, /Lineup Wizard|lineup-wizard/);
   assert.match(experience, /The league superlatives/);
   assert.match(experience, /PUBLIC KEEPER LAB/);
   assert.match(schema, /sleeperWeeklyPlayers/);
