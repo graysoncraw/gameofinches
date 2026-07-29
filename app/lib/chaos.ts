@@ -6,7 +6,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 5;
+export const CHAOS_SCHEMA_VERSION = 6;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -718,7 +718,6 @@ export function buildSuperlatives(
   teamFacts: WeeklyTeamFact[],
   playerFacts: WeeklyPlayerFact[],
   transactions: Record<string, TransactionFeed>,
-  drafts: DraftReport[],
   eloTimeline: EloPoint[],
   teams: Map<string, Team>,
 ): Superlative[] {
@@ -785,7 +784,43 @@ export function buildSuperlatives(
     .filter(([, value]) => value.games >= 4)
     .map(([id, value]) => [id, value.gap / value.games] as const)
     .sort((a, b) => a[1] - b[1])[0];
-  const draftLeader = drafts[0]?.teams[0];
+  const factsByWeek = new Map<string, WeeklyTeamFact[]>();
+  for (const fact of teamFacts) {
+    const key = `${fact.season}:${fact.week}`;
+    const weeklyFacts = factsByWeek.get(key) ?? [];
+    weeklyFacts.push(fact);
+    factsByWeek.set(key, weeklyFacts);
+  }
+  const weeklyHighs = new Map<string, number>();
+  const qualifyingPoints = new Map<string, number>();
+  for (const weeklyFacts of factsByWeek.values()) {
+    if (
+      weeklyFacts.length < 2 ||
+      weeklyFacts.some((fact) => fact.points <= 0)
+    ) {
+      continue;
+    }
+    const highScore = Math.max(...weeklyFacts.map((fact) => fact.points));
+    for (const fact of weeklyFacts) {
+      qualifyingPoints.set(
+        fact.userId,
+        (qualifyingPoints.get(fact.userId) ?? 0) + fact.points,
+      );
+      if (fact.points === highScore) {
+        weeklyHighs.set(
+          fact.userId,
+          (weeklyHighs.get(fact.userId) ?? 0) + 1,
+        );
+      }
+    }
+  }
+  const scoreboardLeader = [...weeklyHighs.entries()].sort(
+    ([userA, highsA], [userB, highsB]) =>
+      highsB - highsA ||
+      (qualifyingPoints.get(userB) ?? 0) -
+        (qualifyingPoints.get(userA) ?? 0) ||
+      userA.localeCompare(userB),
+  )[0];
   const superlatives: Array<Superlative | null> = [];
   const add = (
     id: string,
@@ -812,16 +847,13 @@ export function buildSuperlatives(
   add("heartbreak", "Heartbreak Leader", highest(heartbreak), (v) => `${rounded(v)} pts`, "Most total points scored in losses.");
   add("lineup-wizard", "Lineup Wizard", lowestLineup, (v) => `${rounded(v)} avg gap`, "Smallest average gap between actual and optimal lineups.");
   add("streaker", "The Streaker", highest(streaks), (v) => `${v} straight`, "Longest winning streak in the archive.");
-  if (draftLeader) {
-    superlatives.push({
-      id: "draft-thief",
-      title: "Draft Thief",
-      manager: draftLeader.manager,
-      teamName: draftLeader.teamName,
-      value: `${draftLeader.grade} · ${draftLeader.score}`,
-      explanation: `Best relative draft value in ${drafts[0].season}.`,
-    });
-  }
+  add(
+    "scoreboard-bully",
+    "Scoreboard Bully",
+    scoreboardLeader,
+    (v) => `${v} weekly ${v === 1 ? "high" : "highs"}`,
+    "Most league-high scores across completed weeks; ties count for every weekly leader.",
+  );
 
   const ratingBefore = new Map<string, number>();
   const giantKills = new Map<string, number>();
@@ -1230,13 +1262,11 @@ export function buildLeagueChaos(input: ChaosInput): LeagueChaos {
     input.teamFacts,
     input.seasons,
   );
-  const drafts = buildDraftReports(input.seasons, input.playerFacts);
   const superlatives = buildSuperlatives(
     input.games,
     input.teamFacts,
     input.playerFacts,
     input.transactions,
-    drafts,
     elo.timeline,
     teams,
   );

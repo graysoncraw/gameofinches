@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronDown, Crown, Medal, Trophy } from "lucide-react";
+import { ArrowRight, ChevronDown, Crown, Medal, Trophy } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useState } from "react";
 import type { LeagueData, PlayoffMatchup, Season } from "../lib/sleeper";
 
@@ -80,6 +81,131 @@ function fallbackMatchups(data: LeagueData, season: Season): DisplayMatchup[] {
     .sort((a, b) => a.round - b.round || a.matchId - b.matchId);
 }
 
+function roundLabel(
+  round: number,
+  roundIndex: number,
+  roundCount: number,
+  playoffTeams: number,
+) {
+  if (roundIndex === roundCount - 1) return "Finals";
+  if (roundIndex === roundCount - 2) return "Semifinals";
+  if (roundIndex === 0 && playoffTeams === 6) return "Quarterfinals";
+  return `Round ${round}`;
+}
+
+function matchupClassName(matchup: DisplayMatchup) {
+  return [
+    "playoff-bracket-match",
+    matchup.placement === 1 ? "is-championship" : "",
+    matchup.placement && matchup.placement > 1 ? "is-placement" : "",
+    matchup.bracket === "consolation" ? "is-consolation" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function PlayoffBracket({
+  destination,
+  matchups,
+  season,
+}: {
+  destination: string;
+  matchups: DisplayMatchup[];
+  season: Season;
+}) {
+  const rounds = [...new Set(matchups.map((matchup) => matchup.round))].sort(
+    (a, b) => a - b,
+  );
+
+  return (
+    <div className="playoff-bracket-shell">
+      <div className="playoff-bracket-direction" aria-hidden="true">
+        <span>Opening round</span>
+        <ArrowRight size={17} />
+        <span>{destination}</span>
+      </div>
+      <div className="playoff-bracket-scroll">
+        <div
+          className="playoff-bracket-track"
+          role="group"
+          aria-label={`${season.year} ${destination.toLowerCase()} bracket`}
+        >
+          {rounds.map((round, roundIndex) => {
+            const roundMatchups = matchups
+              .filter((matchup) => matchup.round === round)
+              .sort(
+                (a, b) =>
+                  Number(b.placement === 1) -
+                    Number(a.placement === 1) ||
+                  (a.placement ?? Number.MAX_SAFE_INTEGER) -
+                    (b.placement ?? Number.MAX_SAFE_INTEGER) ||
+                  a.matchId - b.matchId,
+              );
+            const label = roundLabel(
+              round,
+              roundIndex,
+              rounds.length,
+              season.settings.playoffTeams,
+            );
+            const matchupStyle = {
+              "--match-count": Math.max(1, roundMatchups.length),
+            } as CSSProperties;
+
+            return (
+              <section
+                className="playoff-bracket-round"
+                key={round}
+                aria-label={`${label}, week ${roundMatchups[0]?.week}`}
+              >
+                <header className="playoff-bracket-round-heading">
+                  <span>{label}</span>
+                  <strong>Week {roundMatchups[0]?.week}</strong>
+                </header>
+                <div
+                  className={`playoff-bracket-matchups ${
+                    roundMatchups.length > 1 ? "has-multiple" : ""
+                  }`}
+                  style={matchupStyle}
+                >
+                  {roundMatchups.map((matchup) => (
+                    <article
+                      className={matchupClassName(matchup)}
+                      key={`${round}-${matchup.bracket}-${matchup.matchId}`}
+                    >
+                      <header>
+                        <span>{matchup.stage}</span>
+                        <small>
+                          {matchup.bracket === "consolation"
+                            ? "Consolation"
+                            : "Championship bracket"}
+                        </small>
+                      </header>
+                      <div className="playoff-team is-winner">
+                        <div>
+                          <strong>{matchup.winner.teamName}</strong>
+                          <span>{matchup.winner.manager}</span>
+                        </div>
+                        <b>{score(matchup.winner.points)}</b>
+                      </div>
+                      <div className="playoff-team">
+                        <div>
+                          <strong>{matchup.loser.teamName}</strong>
+                          <span>{matchup.loser.manager}</span>
+                        </div>
+                        <b>{score(matchup.loser.points)}</b>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlayoffHistory({ data }: { data: LeagueData }) {
   const completed = data.seasons.filter(
     (season) => season.status === "complete",
@@ -92,7 +218,12 @@ export default function PlayoffHistory({ data }: { data: LeagueData }) {
       ? season.playoffs
       : fallbackMatchups(data, season)
     : [];
-  const rounds = [...new Set(matchups.map((matchup) => matchup.round))];
+  const championshipMatchups = matchups.filter(
+    (matchup) => matchup.bracket === "championship",
+  );
+  const consolationMatchups = matchups.filter(
+    (matchup) => matchup.bracket === "consolation",
+  );
 
   if (!season) return null;
 
@@ -112,7 +243,10 @@ export default function PlayoffHistory({ data }: { data: LeagueData }) {
       <div className="playoff-history-toolbar">
         <label className="select-shell">
           <span className="sr-only">Choose a playoff season</span>
-          <select value={season.year} onChange={(event) => setYear(event.target.value)}>
+          <select
+            value={season.year}
+            onChange={(event) => setYear(event.target.value)}
+          >
             {completed.map((candidate) => (
               <option value={candidate.year} key={candidate.year}>
                 {candidate.year} playoffs
@@ -147,59 +281,28 @@ export default function PlayoffHistory({ data }: { data: LeagueData }) {
         </article>
       </div>
 
-      <div className="playoff-round-list">
-        {rounds.map((round) => {
-          const roundMatchups = matchups.filter(
-            (matchup) => matchup.round === round,
-          );
-          return (
-            <section className="playoff-round" key={round}>
-              <div>
-                <span>ROUND {round}</span>
-                <strong>Week {roundMatchups[0]?.week}</strong>
-              </div>
-              <div className="playoff-matchup-grid">
-                {roundMatchups.map((matchup) => (
-                  <article
-                    className={
-                      matchup.placement === 1 ? "is-championship" : ""
-                    }
-                    key={`${matchup.bracket}-${matchup.matchId}`}
-                  >
-                    <header>
-                      <span>{matchup.stage}</span>
-                      <small>
-                        {matchup.bracket === "consolation"
-                          ? "Consolation"
-                          : "Championship bracket"}
-                      </small>
-                    </header>
-                    <div className="playoff-team is-winner">
-                      <div>
-                        <strong>{matchup.winner.teamName}</strong>
-                        <span>{matchup.winner.manager}</span>
-                      </div>
-                      <b>{score(matchup.winner.points)}</b>
-                    </div>
-                    <div className="playoff-team">
-                      <div>
-                        <strong>{matchup.loser.teamName}</strong>
-                        <span>{matchup.loser.manager}</span>
-                      </div>
-                      <b>{score(matchup.loser.points)}</b>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          );
-        })}
-        {!matchups.length && (
-          <div className="playoff-history-empty">
-            No completed playoff matchups were found for {season.year}.
-          </div>
-        )}
-      </div>
+      {matchups.length ? (
+        <>
+          {championshipMatchups.length > 0 && (
+            <PlayoffBracket
+              destination="Championship"
+              matchups={championshipMatchups}
+              season={season}
+            />
+          )}
+          {consolationMatchups.length > 0 && (
+            <PlayoffBracket
+              destination="Consolation finish"
+              matchups={consolationMatchups}
+              season={season}
+            />
+          )}
+        </>
+      ) : (
+        <div className="playoff-history-empty">
+          No completed playoff matchups were found for {season.year}.
+        </div>
+      )}
     </section>
   );
 }

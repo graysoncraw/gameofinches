@@ -5,6 +5,7 @@ import {
   buildElo,
   buildKeeperCandidates,
   buildRecordBook,
+  buildSuperlatives,
   optimalLineupPoints,
   type WeeklyPlayerFact,
   type WeeklyTeamFact,
@@ -202,6 +203,73 @@ test("record book excludes unplayed zero games and tracks bench gaps", () => {
     records.find((record) => record.id === "bench-gap")?.value,
     30,
   );
+});
+
+test("Scoreboard Bully counts tied weekly highs and excludes zero weeks", () => {
+  const weeklyFact = (
+    userId: string,
+    week: number,
+    points: number,
+    postseason = false,
+  ): WeeklyTeamFact => {
+    const team = userId === "a" ? teamA : teamB;
+    const opponent = userId === "a" ? teamB : teamA;
+    return {
+      season: "2025",
+      week,
+      rosterId: team.rosterId,
+      userId,
+      manager: team.manager,
+      teamName: team.teamName,
+      matchupId: week,
+      opponentRosterId: opponent.rosterId,
+      opponentId: opponent.userId,
+      points,
+      optimalPoints: points,
+      postseason,
+      result: "win",
+    };
+  };
+  const teamFacts = [
+    weeklyFact("a", 1, 140),
+    weeklyFact("b", 1, 100),
+    weeklyFact("a", 2, 130),
+    weeklyFact("b", 2, 130),
+    weeklyFact("a", 3, 0),
+    weeklyFact("b", 3, 0),
+    weeklyFact("a", 4, 100, true),
+    weeklyFact("b", 4, 140, true),
+  ];
+  const teams = new Map([
+    ["a", teamA],
+    ["b", teamB],
+  ]);
+  const tiedAward = buildSuperlatives(
+    [],
+    teamFacts,
+    [],
+    {},
+    [],
+    teams,
+  ).find((award) => award.id === "scoreboard-bully");
+
+  assert.equal(tiedAward?.manager, "Alpha");
+  assert.equal(tiedAward?.value, "2 weekly highs");
+
+  const pointsTiebreakAward = buildSuperlatives(
+    [],
+    teamFacts.map((fact) =>
+      fact.userId === "a" && fact.week === 4
+        ? { ...fact, points: 90, optimalPoints: 90 }
+        : fact,
+    ),
+    [],
+    {},
+    [],
+    teams,
+  ).find((award) => award.id === "scoreboard-bully");
+
+  assert.equal(pointsTiebreakAward?.manager, "Bravo");
 });
 
 test("draft grades exclude keeper picks and remain transparent", () => {

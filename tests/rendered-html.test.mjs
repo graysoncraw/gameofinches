@@ -88,6 +88,9 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
   assert.match(chaos, /optimalLineupPoints/);
   assert.match(chaos, /buildDraftReports/);
+  assert.match(chaos, /Scoreboard Bully/);
+  assert.match(chaos, /scoreboard-bully/);
+  assert.doesNotMatch(chaos, /Draft Thief|draft-thief/);
   assert.match(experience, /The league superlatives/);
   assert.match(experience, /PUBLIC KEEPER LAB/);
   assert.match(schema, /sleeperWeeklyPlayers/);
@@ -108,4 +111,20 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   await assert.rejects(
     access(new URL("../app/chaos/[season]/[week]/page.tsx", import.meta.url)),
   );
+});
+
+test("renders playoff history as a left-to-right bracket", async () => {
+  const [playoffHistory, styles] = await Promise.all([
+    file("app/components/PlayoffHistory.tsx"),
+    file("app/globals.css"),
+  ]);
+
+  assert.match(playoffHistory, /playoff-bracket-track/);
+  assert.match(playoffHistory, /Opening round/);
+  assert.match(playoffHistory, /destination="Championship"/);
+  assert.match(playoffHistory, /destination="Consolation finish"/);
+  assert.match(styles, /\.playoff-bracket-track \{\s*display: flex/);
+  assert.match(styles, /overflow-x: auto/);
+  assert.match(styles, /playoff-bracket-match::after/);
+  assert.doesNotMatch(playoffHistory, /playoff-round-list/);
 });
