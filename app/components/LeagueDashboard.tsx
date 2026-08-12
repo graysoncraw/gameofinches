@@ -6,14 +6,12 @@ import {
   ArrowUpRight,
   CalendarDays,
   ChevronDown,
-  CircleDot,
   Clock3,
   Crown,
   DraftingCompass,
   Gauge,
   History,
   Medal,
-  RefreshCw,
   Search,
   ShieldCheck,
   Swords,
@@ -95,24 +93,12 @@ function standings(season: Season) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const label = status.replace("_", " ");
-  return (
-    <span className={`status-pill status-pill--${status}`}>
-      <CircleDot size={13} aria-hidden="true" />
-      {label}
-    </span>
-  );
-}
-
 function DraftCountdown({
   season,
   startsAt,
-  sleeperScheduled,
 }: {
   season: string;
   startsAt: number;
-  sleeperScheduled: boolean;
 }) {
   const [now, setNow] = useState<number | null>(null);
 
@@ -304,13 +290,6 @@ export default function LeagueDashboard({
   const mostPoints = [...data.allTime].sort(
     (a, b) => b.pointsFor - a.pointsFor,
   )[0];
-  const lastUpdated = new Date(data.fetchedAt).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/Chicago",
-  });
   const activeNav =
     activePage === "profile" ? "teams" : activePage.split("-")[0];
   const navigation: Array<{
@@ -513,7 +492,6 @@ export default function LeagueDashboard({
         <DraftCountdown
           season={current.year}
           startsAt={draftStartsAt}
-          sleeperScheduled={Boolean(current.draft?.startTime)}
         />
       )}
 

@@ -1471,7 +1471,7 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       season.teams.map((team) => [`${season.year}:${team.userId}`, team] as const),
     ),
   );
-  const teamFacts: WeeklyTeamFact[] = games.flatMap((game, index) => {
+  const derivedTeamFacts: WeeklyTeamFact[] = games.flatMap((game, index) => {
     const teamA = teamsBySeason.get(`${game.season}:${game.managerAId}`);
     const teamB = teamsBySeason.get(`${game.season}:${game.managerBId}`);
     return [
@@ -1517,7 +1517,7 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       },
     ];
   });
-  const playerFacts: WeeklyPlayerFact[] = snapshot.data.topPerformances.map(
+  const derivedPlayerFacts: WeeklyPlayerFact[] = snapshot.data.topPerformances.map(
     (performance, index) => {
       const team = teamsBySeason.get(
         `${performance.season}:${performance.ownerId}`,
@@ -1536,14 +1536,25 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       };
     },
   );
+  const archivedTeamFacts = snapshot.facts?.teams ?? [];
+  const archivedPlayerFacts = snapshot.facts?.players ?? [];
+  const archivedRosterFacts = snapshot.facts?.rosters ?? [];
   snapshot.data.chaos = buildLeagueChaos({
     seasons: snapshot.data.seasons,
     games,
-    teamFacts,
-    playerFacts,
-    rosterFacts: snapshot.facts?.rosters ?? [],
+    teamFacts: archivedTeamFacts.length
+      ? archivedTeamFacts
+      : derivedTeamFacts,
+    playerFacts: archivedPlayerFacts.length
+      ? archivedPlayerFacts
+      : derivedPlayerFacts,
+    rosterFacts: archivedRosterFacts,
     transactions: snapshot.transactions,
-    archiveReady: false,
+    archiveReady: Boolean(
+      archivedTeamFacts.length &&
+        archivedPlayerFacts.length &&
+        archivedRosterFacts.length,
+    ),
   });
   return snapshot;
 }

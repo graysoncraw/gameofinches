@@ -21,6 +21,9 @@ test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
   assert.match(sleeper, /T\$\{window\}:00:00-America\/Chicago/);
   assert.match(sleeper, /fetched_date === today/);
   assert.match(sleeper, /if \(cached\) return cached/);
+  assert.match(sleeper, /const archivedPlayerFacts = snapshot\.facts\?\.players/);
+  assert.match(sleeper, /playerFacts: archivedPlayerFacts\.length/);
+  assert.match(sleeper, /rosterFacts: archivedRosterFacts/);
   assert.match(sleeper, /losers_bracket/);
   assert.match(sleeper, /\?::jsonb/);
   assert.match(schema, /sleeperPlayerCache/);
