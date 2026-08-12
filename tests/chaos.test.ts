@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDraftReports,
   buildElo,
+  buildFranchiseRosterHistory,
   buildKeeperCandidates,
   buildRecordBook,
   buildSuperlatives,
@@ -149,6 +150,91 @@ test("optimal lineup respects duplicate QB and flex slots", () => {
       ],
     ),
     85,
+  );
+});
+
+test("roster history compares Week 1 with the exact final roster", () => {
+  const fact = (
+    playerId: string,
+    playerName: string,
+    week: number,
+    position: string,
+  ): WeeklyPlayerFact => ({
+    season: "2025",
+    week,
+    rosterId: 1,
+    userId: "a",
+    playerId,
+    playerName,
+    position,
+    nflTeam: "AAA",
+    points: 0,
+    starter: false,
+  });
+  const weeklyFacts = [
+    fact("qb", "Opening Quarterback", 1, "QB"),
+    fact("gone", "Departed Receiver", 1, "WR"),
+    fact("qb", "Opening Quarterback", 17, "QB"),
+  ];
+  const finalRoster = [
+    fact("qb", "Opening Quarterback", 0, "QB"),
+    fact("new", "Late Running Back", 0, "RB"),
+  ];
+
+  const history = buildFranchiseRosterHistory(
+    [season],
+    weeklyFacts,
+    finalRoster,
+    "a",
+  );
+
+  assert.equal(history.length, 1);
+  assert.equal(history[0].season, "2025");
+  assert.equal(history[0].finalWeek, 17);
+  assert.deepEqual(
+    history[0].weekOne.map((player) => player.playerId),
+    ["qb", "gone"],
+  );
+  assert.deepEqual(
+    history[0].finalRoster.map((player) => player.playerId),
+    ["qb", "new"],
+  );
+});
+
+test("roster history falls back to the final recorded matchup roster", () => {
+  const facts: WeeklyPlayerFact[] = [
+    {
+      season: "2025",
+      week: 1,
+      rosterId: 1,
+      userId: "a",
+      playerId: "opening",
+      playerName: "Opening Player",
+      position: "WR",
+      nflTeam: "AAA",
+      points: 10,
+      starter: true,
+    },
+    {
+      season: "2025",
+      week: 16,
+      rosterId: 1,
+      userId: "a",
+      playerId: "closing",
+      playerName: "Closing Player",
+      position: "RB",
+      nflTeam: "BBB",
+      points: 12,
+      starter: true,
+    },
+  ];
+
+  const history = buildFranchiseRosterHistory([season], facts, [], "a");
+
+  assert.equal(history[0].finalWeek, 16);
+  assert.deepEqual(
+    history[0].finalRoster.map((player) => player.playerId),
+    ["closing"],
   );
 });
 

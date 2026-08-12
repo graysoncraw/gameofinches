@@ -761,6 +761,168 @@
   padding: 24px 0;
 }
 
+.roster-history {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 7px 7px 0 var(--ink);
+  margin-bottom: 22px;
+  padding: 24px;
+}
+
+.roster-history-heading {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.roster-history-heading .panel-title {
+  margin-bottom: 0;
+}
+
+.roster-history-heading label {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.roster-history-heading label > span {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.roster-history-heading select {
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  font: 800 11px var(--font-geist-mono), monospace;
+  min-width: 170px;
+  padding: 9px 30px 9px 10px;
+}
+
+.roster-turnover {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 20px 0;
+  padding: 10px 0;
+}
+
+.roster-turnover > span {
+  color: var(--orange);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.roster-turnover small {
+  color: var(--muted);
+  font-size: 9px;
+  margin-left: auto;
+}
+
+.roster-snapshot-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.roster-snapshot {
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+
+.roster-snapshot > header {
+  align-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.roster-snapshot > header span,
+.roster-snapshot > header b {
+  color: #aaa69d;
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+.roster-snapshot > header strong {
+  display: block;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.roster-player-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 34px minmax(0, 1fr) 30px auto;
+  min-height: 42px;
+  padding: 6px 12px;
+}
+
+.roster-player-row:last-child {
+  border-bottom: 0;
+}
+
+.roster-player-row > strong {
+  font-size: 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-player-row > small {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  text-align: center;
+}
+
+.roster-position {
+  background: #e5e0d5;
+  color: var(--ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 4px 2px;
+  text-align: center;
+}
+
+.roster-change {
+  border: 1px solid currentColor;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 900;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+
+.roster-change--joined {
+  color: #197245;
+}
+
+.roster-change--departed {
+  color: #a13722;
+}
+
 @media (max-width: 1000px) {
   .superlative-grid,
   .record-book-grid {
@@ -812,6 +974,10 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .roster-snapshot-grid {
+    grid-template-columns: 1fr;
+  }
+
   .franchise-stat-grid > div:nth-child(2) {
     border-right: 0;
   }
@@ -836,5 +1002,33 @@
 
   .franchise-stat-grid > div:last-child {
     border-bottom: 0;
+  }
+
+  .roster-history {
+    padding: 18px 14px;
+  }
+
+  .roster-history-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .roster-history-heading label,
+  .roster-history-heading select {
+    width: 100%;
+  }
+
+  .roster-turnover small {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .roster-player-row {
+    grid-template-columns: 34px minmax(0, 1fr) 28px;
+  }
+
+  .roster-change {
+    grid-column: 2 / -1;
+    justify-self: start;
   }
 }
