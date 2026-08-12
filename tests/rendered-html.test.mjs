@@ -150,3 +150,11 @@ test("renders playoff history as a left-to-right bracket", async () => {
   assert.match(styles, /playoff-bracket-match::after/);
   assert.doesNotMatch(playoffHistory, /playoff-round-list/);
 });
+
+test("ships the Game of Inches favicon", async () => {
+  const icon = await file("app/icon.svg");
+
+  assert.match(icon, /#0d1618/);
+  assert.match(icon, /#ff5a1f/);
+  assert.match(icon, />G<tspan[^>]*>\/<\/tspan>I</);
+});

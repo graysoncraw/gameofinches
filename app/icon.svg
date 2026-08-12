@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#0d1618" />
+  <path d="M5 10h54M5 54h54" stroke="#ff5a1f" stroke-width="4" />
+  <text
+    x="31"
+    y="43"
+    fill="#fffdf7"
+    font-family="Arial Black, Arial, sans-serif"
+    font-size="31"
+    font-weight="900"
+    letter-spacing="-3"
+    text-anchor="middle"
+  >G<tspan fill="#ff5a1f">/</tspan>I</text>
+</svg>
