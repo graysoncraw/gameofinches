@@ -35,6 +35,7 @@ import {
   projectKeeperCandidate,
 } from "../lib/keeper-rules";
 import type { LeagueData } from "../lib/sleeper";
+import { keeperDeadlineForSeason } from "../lib/league-dates";
 
 function number(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -288,9 +289,7 @@ export function KeeperWarRoom({
       ? chosen[index].costRound
       : Math.max(1, chosen[index].costRound - 1);
   };
-  const deadline = current.draft?.startTime
-    ? new Date(current.draft.startTime - 7 * 24 * 60 * 60 * 1000)
-    : null;
+  const deadline = keeperDeadlineForSeason(current.year);
 
   return (
     <section className="keeper-lab-section">

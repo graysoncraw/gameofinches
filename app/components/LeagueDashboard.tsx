@@ -20,8 +20,9 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeeperRecord } from "../lib/keepers";
+import { resolveDraftStart } from "../lib/league-dates";
 import type {
   AllTimeManager,
   DraftPick,
@@ -101,6 +102,70 @@ function StatusPill({ status }: { status: string }) {
       <CircleDot size={13} aria-hidden="true" />
       {label}
     </span>
+  );
+}
+
+function DraftCountdown({
+  season,
+  startsAt,
+  sleeperScheduled,
+}: {
+  season: string;
+  startsAt: number;
+  sleeperScheduled: boolean;
+}) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [startsAt]);
+
+  const remaining = now === null ? null : Math.max(0, startsAt - now);
+  const totalSeconds = remaining === null ? null : Math.floor(remaining / 1000);
+  const values = totalSeconds === null
+    ? ["--", "--", "--", "--"]
+    : [
+        String(Math.floor(totalSeconds / 86400)),
+        String(Math.floor((totalSeconds % 86400) / 3600)).padStart(2, "0"),
+        String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0"),
+        String(totalSeconds % 60).padStart(2, "0"),
+      ];
+  const draftDate = new Date(startsAt).toLocaleString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+    timeZoneName: "short",
+  });
+  const draftStarted = totalSeconds === 0;
+
+  return (
+    <section className="draft-clock" aria-label={`${season} draft countdown`}>
+      <div className="draft-clock-date">
+        <span>
+          <Clock3 size={15} aria-hidden="true" /> {season} DRAFT NIGHT
+        </span>
+        <strong>{draftDate}</strong>
+      </div>
+      {draftStarted ? (
+        <div className="draft-clock-live">The draft is on the clock.</div>
+      ) : (
+        <div className="draft-clock-units" aria-label="Time remaining">
+          {values.map((value, index) => (
+            <div key={["days", "hours", "minutes", "seconds"][index]}>
+              <strong>{value}</strong>
+              <span>{["Days", "Hours", "Minutes", "Seconds"][index]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -184,6 +249,10 @@ export default function LeagueDashboard({
     (season) => season.status === "complete",
   );
   const latestCompleted = completedSeasons[0];
+  const draftStartsAt = resolveDraftStart(
+    current.year,
+    current.draft?.startTime,
+  );
   const [archiveYear, setArchiveYear] = useState(
     latestCompleted?.year ?? current.year,
   );
@@ -440,15 +509,17 @@ export default function LeagueDashboard({
 
       {activePage === "overview" && (
         <>
+      {draftStartsAt && (
+        <DraftCountdown
+          season={current.year}
+          startsAt={draftStartsAt}
+          sleeperScheduled={Boolean(current.draft?.startTime)}
+        />
+      )}
+
       <section className="hero" id="top">
         <div className="yard-lines" aria-hidden="true" />
         <div className="hero-copy">
-          <div className="eyebrow-row">
-            <StatusPill status={current.status} />
-            <span className="live-note">
-              <RefreshCw size={13} aria-hidden="true" /> Synced {lastUpdated}
-            </span>
-          </div>
           <p className="kicker">EST. 2023 · 10 FRANCHISES · 2 KEEPERS</p>
           <h1>
             Every inch

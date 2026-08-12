@@ -576,6 +576,96 @@ main {
   height: 13px;
 }
 
+.draft-clock {
+  align-items: stretch;
+  background: var(--ink);
+  border-top: 1px solid rgba(255, 253, 247, 0.18);
+  color: var(--white);
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(500px, 1.7fr);
+  padding: 0 clamp(24px, 5vw, 76px);
+}
+
+.draft-clock-date {
+  align-self: center;
+  padding: 24px 26px 24px 0;
+}
+
+.draft-clock-date > span {
+  align-items: center;
+  color: var(--orange);
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 900;
+  gap: 7px;
+  letter-spacing: 0.1em;
+}
+
+.draft-clock-date > strong {
+  display: block;
+  font-size: clamp(16px, 1.55vw, 22px);
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  margin-top: 8px;
+}
+
+.draft-clock-date > small {
+  color: rgba(255, 253, 247, 0.52);
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  margin-top: 7px;
+  text-transform: uppercase;
+}
+
+.draft-clock-units {
+  border-left: 1px solid rgba(255, 253, 247, 0.18);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.draft-clock-units > div {
+  align-items: center;
+  border-right: 1px solid rgba(255, 253, 247, 0.18);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 18px 8px;
+}
+
+.draft-clock-units strong {
+  color: var(--mint);
+  font-family: var(--font-display);
+  font-size: clamp(37px, 4vw, 64px);
+  letter-spacing: -0.055em;
+  line-height: 0.85;
+}
+
+.draft-clock-units span {
+  color: rgba(255, 253, 247, 0.52);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+.draft-clock-live {
+  align-items: center;
+  border-left: 1px solid rgba(255, 253, 247, 0.18);
+  color: var(--mint);
+  display: flex;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4vw, 58px);
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
 .quick-stats {
   background: var(--orange);
   border-bottom: 1px solid var(--ink);
@@ -3217,6 +3307,10 @@ footer > a {
 }
 
 @media (max-width: 1120px) {
+  .draft-clock {
+    grid-template-columns: minmax(220px, 0.8fr) minmax(420px, 1.4fr);
+  }
+
   .topbar {
     grid-template-rows: 70px 48px;
     grid-template-columns: 1fr auto;
@@ -3492,6 +3586,29 @@ footer > a {
 }
 
 @media (max-width: 620px) {
+  .draft-clock {
+    grid-template-columns: 1fr;
+    padding: 0 18px;
+  }
+
+  .draft-clock-date {
+    padding: 22px 0;
+  }
+
+  .draft-clock-units,
+  .draft-clock-live {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 253, 247, 0.18);
+  }
+
+  .draft-clock-units > div:first-child {
+    border-left: 1px solid rgba(255, 253, 247, 0.18);
+  }
+
+  .draft-clock-units strong {
+    font-size: 38px;
+  }
+
   .playoff-history-section {
     padding: 64px 20px;
   }
