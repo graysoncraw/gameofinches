@@ -251,7 +251,19 @@ export default function LeagueDashboard({
     items?: Array<{ href: string; label: string; page: string }>;
   }> = [
     { key: "overview", href: "/", label: "Overview" },
-    { key: "teams", href: "/teams", label: "Teams" },
+    {
+      key: "teams",
+      href: "/teams",
+      label: "Teams",
+      items: [
+        { href: "/teams", label: "Active teams", page: "teams" },
+        {
+          href: "/teams/retired",
+          label: "Retired teams",
+          page: "teams-retired",
+        },
+      ],
+    },
     {
       key: "history",
       href: "/history",
@@ -535,7 +547,7 @@ export default function LeagueDashboard({
       <section className="content-section" id="franchises">
         <div className="section-heading">
           <div>
-            <span className="section-number">01 / FRANCHISES</span>
+            <span className="section-number">01 / ACTIVE TEAMS</span>
             <h2>The ten in the room</h2>
           </div>
           <p>
@@ -579,6 +591,54 @@ export default function LeagueDashboard({
             </a>
           ))}
         </div>
+      </section>
+      )}
+
+      {activePage === "teams-retired" && (
+      <section className="content-section retired-franchises" id="retired-franchises">
+        <div className="section-heading">
+          <div>
+            <span className="section-number">02 / RETIRED TEAMS</span>
+            <h2>Gone, not forgotten.</h2>
+          </div>
+          <p>
+            Former managers keep their own records, transactions, players, and
+            roster history—even when a new owner inherits their old slot.
+          </p>
+        </div>
+
+        {data.chaos.franchises.length ? (
+          <div className="team-grid retired-team-grid">
+            {data.chaos.franchises.map((franchise, index) => (
+              <a
+                className="team-card retired-team-card"
+                href={`/teams/${franchise.userId}`}
+                key={franchise.userId}
+              >
+                <div className="team-card-top">
+                  <span className="roster-number">RETIRED FRANCHISE</span>
+                  <span className="team-index">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <TeamAvatar team={franchise} size="large" />
+                <div className="team-card-copy">
+                  <h3>{franchise.teamName}</h3>
+                  <p>@{franchise.manager}</p>
+                </div>
+                <div className="team-card-foot">
+                  <span>Through {franchise.lastSeason}</span>
+                  <span>{franchise.seasons} seasons</span>
+                </div>
+                <span className="team-dossier-link">
+                  Open archive <ArrowUpRight size={14} aria-hidden="true" />
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">No retired teams in the archive.</p>
+        )}
       </section>
       )}
 

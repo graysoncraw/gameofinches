@@ -38,6 +38,7 @@ export function projectKeeperCandidate(
       : candidate.tradeTiming === "in-season"
         ? 2
         : Math.max(0, previous.yearsRemaining - 1);
+  const keeperYearsUsed = Math.max(1, 3 - yearsRemaining);
 
   return {
     ...candidate,
@@ -49,6 +50,6 @@ export function projectKeeperCandidate(
         ? "Offseason trade · timer reset to 3 years; keeper cost lineage retained"
         : candidate.tradeTiming === "in-season"
           ? "In-season trade · 2 years left; keeper cost lineage retained"
-          : `Returning keeper · ${previous.yearsRemaining} years previously`,
+          : `Returning keeper · ${keeperYearsUsed} ${keeperYearsUsed === 1 ? "year" : "years"} previously`,
   };
 }

@@ -494,13 +494,21 @@ export function FranchiseDossier({
   const games = profile.wins + profile.losses + profile.ties;
   return (
     <section className="franchise-page">
-      <a className="franchise-back" href="/teams">
-        <ArrowLeft size={15} aria-hidden="true" /> All franchises
+      <a
+        className="franchise-back"
+        href={profile.active ? "/teams" : "/teams/retired"}
+      >
+        <ArrowLeft size={15} aria-hidden="true" />
+        {profile.active ? "Active teams" : "Retired teams"}
       </a>
       <div className="franchise-hero">
         <Initials name={profile.teamName} avatar={profile.avatar} />
         <div>
-          <span>FRANCHISE DOSSIER</span>
+          <span>
+            {profile.active
+              ? "ACTIVE FRANCHISE DOSSIER"
+              : `RETIRED AFTER ${profile.lastSeason}`}
+          </span>
           <h1>{profile.teamName}</h1>
           <p>{profile.manager}</p>
         </div>
@@ -580,20 +588,26 @@ export function FranchiseDossier({
               <strong>Transaction tendencies</strong>
             </div>
           </div>
-          <dl className="transaction-tendencies">
-            <div>
-              <dt>Trades</dt>
-              <dd>{profile.tradeCount}</dd>
-            </div>
-            <div>
-              <dt>Waiver wins</dt>
-              <dd>{profile.waiverCount}</dd>
-            </div>
-            <div>
-              <dt>FAAB spent</dt>
-              <dd>${profile.faabSpent}</dd>
-            </div>
-          </dl>
+          {profile.tradeCount || profile.waiverCount || profile.faabSpent ? (
+            <dl className="transaction-tendencies">
+              <div>
+                <dt>Trades</dt>
+                <dd>{profile.tradeCount}</dd>
+              </div>
+              <div>
+                <dt>Waiver wins</dt>
+                <dd>{profile.waiverCount}</dd>
+              </div>
+              <div>
+                <dt>FAAB spent</dt>
+                <dd>${profile.faabSpent}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="profile-empty">
+              No transactions recorded for this manager yet.
+            </p>
+          )}
         </article>
       </div>
       <div className="franchise-timeline">

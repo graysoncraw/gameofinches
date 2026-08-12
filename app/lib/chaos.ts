@@ -6,7 +6,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 8;
+export const CHAOS_SCHEMA_VERSION = 9;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -114,6 +114,8 @@ export type FranchiseProfile = {
   manager: string;
   teamName: string;
   avatar: string | null;
+  active: boolean;
+  lastSeason: string;
   teamNames: Array<{ season: string; teamName: string }>;
   seasons: number;
   titles: number;
@@ -922,6 +924,9 @@ export function buildFranchises(
 ): FranchiseProfile[] {
   const teams = currentTeamMap(seasons);
   const completed = seasons.filter((season) => season.status === "complete");
+  const activeUserIds = new Set(
+    (seasons[0]?.teams ?? []).map((team) => team.userId),
+  );
   return [...teams.values()].map((current) => {
     const seasonTeams = seasons
       .map((season) => ({
@@ -971,12 +976,12 @@ export function buildFranchises(
     const favorite = [...opponents].sort(
       (a, b) => b.wins - b.losses - (a.wins - a.losses),
     )[0];
-    const feeds = Object.values(transactions).flatMap((feed) => feed.transactions);
-    const teamRosterIds = new Set(seasonTeams.map((entry) => entry.team.rosterId));
-    const relevantSides = feeds.flatMap((transaction) =>
-      transaction.teams
-        .filter((side) => teamRosterIds.has(side.rosterId))
-        .map((side) => ({ transaction, side })),
+    const relevantSides = seasonTeams.flatMap((entry) =>
+      (transactions[entry.season]?.transactions ?? []).flatMap((transaction) =>
+        transaction.teams
+          .filter((side) => side.rosterId === entry.team.rosterId)
+          .map((side) => ({ transaction, side })),
+      ),
     );
     const finance = settledTeams.reduce(
       (sum, entry) => {
@@ -1010,6 +1015,8 @@ export function buildFranchises(
       manager: current.manager,
       teamName: current.teamName,
       avatar: current.avatar,
+      active: activeUserIds.has(current.userId),
+      lastSeason: seasonTeams[0]?.season ?? seasons[0]?.year ?? "",
       teamNames: seasonTeams.map((entry) => ({
         season: entry.season,
         teamName: entry.team.teamName,

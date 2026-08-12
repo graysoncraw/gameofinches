@@ -89,7 +89,7 @@ test("includes the requested league records and keeper labels", async () => {
 });
 
 test("ships league records, superlatives, profiles, and the public Keeper Lab", async () => {
-  const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews] =
+  const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews, retiredTeams] =
     await Promise.all([
     file("app/lib/chaos.ts"),
     file("app/components/LeagueExtras.tsx"),
@@ -98,6 +98,7 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
     file("app/history/[view]/page.tsx"),
     file("app/records/[view]/page.tsx"),
     file("app/keepers/[view]/page.tsx"),
+    file("app/teams/retired/page.tsx"),
   ]);
 
   assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
@@ -119,10 +120,13 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(dashboard, /\/history\/playoffs/);
   assert.match(dashboard, /\/records\/superlatives/);
   assert.match(dashboard, /\/keepers\/lab/);
+  assert.match(dashboard, /\/teams\/retired/);
+  assert.match(dashboard, /RETIRED TEAMS/);
   assert.match(historyViews, /history-seasons/);
   assert.match(historyViews, /history-playoffs/);
   assert.match(recordViews, /records-elo/);
   assert.match(keeperViews, /keepers-rules/);
+  assert.match(retiredTeams, /teams-retired/);
   assert.doesNotMatch(dashboard, /"chaos", "\/chaos", "Chaos"/);
   assert.doesNotMatch(dashboard, /DraftReportCards/);
   assert.doesNotMatch(dashboard, /TradeTrees/);

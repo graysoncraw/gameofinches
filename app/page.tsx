@@ -47,6 +47,8 @@ function dataForPage(
           ? chaos.franchises.filter(
               (franchise) => franchise.userId === profileUserId,
             )
+          : activePage === "teams-retired"
+            ? chaos.franchises.filter((franchise) => !franchise.active)
           : [],
       keeperCandidates:
         activePage === "keepers-lab" ? chaos.keeperCandidates : [],

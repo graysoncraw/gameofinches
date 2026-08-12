@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDraftReports,
   buildElo,
+  buildFranchises,
   buildFranchiseRosterHistory,
   buildKeeperCandidates,
   buildRecordBook,
@@ -236,6 +237,107 @@ test("roster history falls back to the final recorded matchup roster", () => {
     history[0].finalRoster.map((player) => player.playerId),
     ["closing"],
   );
+});
+
+test("replacement managers do not inherit retired managers' transactions", () => {
+  const cam: Team = {
+    ...teamA,
+    rosterId: 10,
+    userId: "cam",
+    manager: "camaustin",
+    username: "camaustin",
+    teamName: "Nabers in Paris",
+  };
+  const brina: Team = {
+    ...teamA,
+    rosterId: 10,
+    userId: "brina",
+    manager: "brinacraw",
+    username: "brinacraw",
+    teamName: "brinacraw's Team",
+  };
+  const retiredSeason: Season = {
+    ...season,
+    teams: [cam],
+    champion: cam,
+    runnerUp: null,
+  };
+  const currentSeason: Season = {
+    ...season,
+    year: "2026",
+    status: "pre_draft",
+    teams: [brina],
+    champion: null,
+    runnerUp: null,
+    draft: null,
+  };
+  const camTransactions: TransactionFeed = {
+    season: "2025",
+    counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
+    transactions: [
+      {
+        id: "cam-trade",
+        type: "trade",
+        week: 8,
+        created: 1,
+        waiverBid: null,
+        teams: [
+          {
+            rosterId: 10,
+            teamName: cam.teamName,
+            manager: cam.manager,
+            adds: [],
+            drops: [],
+          },
+        ],
+        draftPicks: [],
+        faabTransfers: [],
+      },
+    ],
+  };
+
+  const profiles = buildFranchises(
+    [currentSeason, retiredSeason],
+    [],
+    [],
+    { standings: [], timeline: [] },
+    { "2025": camTransactions },
+    [],
+    [],
+  );
+  const camProfile = profiles.find((profile) => profile.userId === "cam");
+  const brinaProfile = profiles.find((profile) => profile.userId === "brina");
+
+  assert.equal(camProfile?.active, false);
+  assert.equal(camProfile?.lastSeason, "2025");
+  assert.equal(camProfile?.tradeCount, 1);
+  assert.equal(brinaProfile?.active, true);
+  assert.equal(brinaProfile?.tradeCount, 0);
+  assert.equal(brinaProfile?.waiverCount, 0);
+  assert.equal(brinaProfile?.faabSpent, 0);
+
+  const inheritedKeepers = buildKeeperCandidates(
+    [currentSeason, retiredSeason],
+    [],
+    {},
+    [
+      {
+        season: "2025",
+        week: 0,
+        rosterId: 10,
+        userId: "cam",
+        playerId: "inherited-player",
+        playerName: "Inherited Player",
+        position: "WR",
+        nflTeam: "AAA",
+        points: 0,
+        starter: false,
+      },
+    ],
+    true,
+  );
+  assert.equal(inheritedKeepers[0]?.userId, "brina");
+  assert.equal(inheritedKeepers[0]?.rosterId, 10);
 });
 
 test("Elo is chronological, symmetric, and starts at 1500", () => {
@@ -643,11 +745,23 @@ test("keeper history keeps trade cost lineage but applies the correct timer", ()
     [previous],
     "2025",
   );
+  const expired = projectKeeperCandidate(
+    {
+      ...baseCandidate,
+      acquisitionType: "draft",
+      tradeTiming: null,
+    },
+    [previous],
+    "2025",
+  );
 
   assert.equal(inSeason.costRound, 5);
   assert.equal(inSeason.yearsRemaining, 2);
   assert.equal(offseason.costRound, 5);
   assert.equal(offseason.yearsRemaining, 3);
+  assert.equal(expired.yearsRemaining, 0);
+  assert.match(expired.source, /3 years previously/);
+  assert.doesNotMatch(expired.source, /1 year previously/);
 });
 
 test("two first-round keepers cannot coexist", () => {
