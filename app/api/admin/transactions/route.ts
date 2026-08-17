@@ -23,6 +23,14 @@ type TradeAsset = {
   toRosterId: number;
 };
 
+type TradeDraftPick = {
+  season: string;
+  round: number;
+  originalRosterId: number;
+  fromRosterId: number;
+  toRosterId: number;
+};
+
 function unauthorized() {
   return NextResponse.json(
     { error: "Commissioner access is required." },
@@ -59,6 +67,41 @@ function validateAsset(value: unknown, rosterIds: Set<number>): TradeAsset {
     toRosterId,
     position: String(input.position ?? "").trim().toUpperCase().slice(0, 5),
     nflTeam: String(input.nflTeam ?? "").trim().toUpperCase().slice(0, 4),
+  };
+}
+
+function validateDraftPick(
+  value: unknown,
+  rosterIds: Set<number>,
+): TradeDraftPick {
+  if (!value || typeof value !== "object") {
+    throw new Error("Every draft pick needs season, round, and team details.");
+  }
+  const input = value as Record<string, unknown>;
+  const season = validSeason(input.season);
+  const round = Number(input.round);
+  const originalRosterId = Number(input.originalRosterId);
+  const fromRosterId = Number(input.fromRosterId);
+  const toRosterId = Number(input.toRosterId);
+  if (!Number.isInteger(round) || round < 1 || round > 19) {
+    throw new Error("Draft-pick round must be between 1 and 19.");
+  }
+  if (
+    !rosterIds.has(originalRosterId) ||
+    !rosterIds.has(fromRosterId) ||
+    !rosterIds.has(toRosterId)
+  ) {
+    throw new Error("A draft-pick team is not part of that league season.");
+  }
+  if (fromRosterId === toRosterId) {
+    throw new Error(`${season} Round ${round} must move to a different team.`);
+  }
+  return {
+    season,
+    round,
+    originalRosterId,
+    fromRosterId,
+    toRosterId,
   };
 }
 
@@ -108,6 +151,24 @@ export async function POST(request: Request) {
         assets.findIndex((item) => item.playerId === asset.playerId) !== index,
     );
     if (duplicate) throw new Error(`${duplicate.playerName} is listed more than once.`);
+    const rosterIds = new Set(teamByRoster.keys());
+    const draftPicks = Array.isArray(input.draftPicks)
+      ? input.draftPicks.map((pick) => validateDraftPick(pick, rosterIds))
+      : [];
+    const duplicatePick = draftPicks.find(
+      (pick, index) =>
+        draftPicks.findIndex(
+          (item) =>
+            item.season === pick.season &&
+            item.round === pick.round &&
+            item.originalRosterId === pick.originalRosterId,
+        ) !== index,
+    );
+    if (duplicatePick) {
+      throw new Error(
+        `${duplicatePick.season} Round ${duplicatePick.round} from that original team is listed more than once.`,
+      );
+    }
 
     const week = Number(input.week);
     if (!Number.isInteger(week) || week < 0 || week > 18) {
@@ -126,8 +187,8 @@ export async function POST(request: Request) {
         )
       : undefined;
     if (existingId && !existing) throw new Error("That trade no longer exists.");
-    if (!existing && assets.length === 0) {
-      throw new Error("A manual trade needs at least one player.");
+    if (!existing && assets.length === 0 && draftPicks.length === 0) {
+      throw new Error("A manual trade needs at least one player or draft pick.");
     }
 
     const involved = new Set<number>();
@@ -135,12 +196,12 @@ export async function POST(request: Request) {
       involved.add(asset.fromRosterId);
       involved.add(asset.toRosterId);
     }
-    if (assets.length === 0) {
-      for (const side of existing?.teams ?? []) involved.add(side.rosterId);
+    for (const pick of draftPicks) {
+      involved.add(pick.fromRosterId);
+      involved.add(pick.toRosterId);
     }
-    for (const pick of existing?.draftPicks ?? []) {
-      involved.add(pick.previousOwnerRosterId);
-      involved.add(pick.ownerRosterId);
+    if (assets.length === 0 && draftPicks.length === 0) {
+      for (const side of existing?.teams ?? []) involved.add(side.rosterId);
     }
     for (const transfer of existing?.faabTransfers ?? []) {
       involved.add(transfer.senderRosterId);
@@ -185,7 +246,22 @@ export async function POST(request: Request) {
       created,
       waiverBid: null,
       teams,
-      draftPicks: existing?.draftPicks ?? [],
+      draftPicks: draftPicks.map((pick) => ({
+        season: pick.season,
+        round: pick.round,
+        originalTeam:
+          teamByRoster.get(pick.originalRosterId)?.teamName ??
+          `Roster ${pick.originalRosterId}`,
+        from:
+          teamByRoster.get(pick.fromRosterId)?.teamName ??
+          `Roster ${pick.fromRosterId}`,
+        to:
+          teamByRoster.get(pick.toRosterId)?.teamName ??
+          `Roster ${pick.toRosterId}`,
+        originalRosterId: pick.originalRosterId,
+        previousOwnerRosterId: pick.fromRosterId,
+        ownerRosterId: pick.toRosterId,
+      })),
       faabTransfers: existing?.faabTransfers ?? [],
     };
     const kind =

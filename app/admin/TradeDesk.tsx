@@ -24,11 +24,20 @@ type TradeAsset = {
   toRosterId: number;
 };
 
+type DraftPickAsset = {
+  season: string;
+  round: number;
+  originalRosterId: number;
+  fromRosterId: number;
+  toRosterId: number;
+};
+
 type TradeDraft = {
   transactionId: string;
   date: string;
   week: number;
   assets: TradeAsset[];
+  draftPicks: DraftPickAsset[];
 };
 
 const blankAsset = (teams: Team[]): TradeAsset => ({
@@ -40,11 +49,23 @@ const blankAsset = (teams: Team[]): TradeAsset => ({
   toRosterId: teams[1]?.rosterId ?? 0,
 });
 
-const blankDraft = (teams: Team[]): TradeDraft => ({
+const blankDraft = (): TradeDraft => ({
   transactionId: "",
   date: new Date().toISOString().slice(0, 10),
   week: 0,
-  assets: [blankAsset(teams)],
+  assets: [],
+  draftPicks: [],
+});
+
+const blankDraftPick = (
+  teams: Team[],
+  season: string,
+): DraftPickAsset => ({
+  season,
+  round: 1,
+  originalRosterId: teams[0]?.rosterId ?? 0,
+  fromRosterId: teams[0]?.rosterId ?? 0,
+  toRosterId: teams[1]?.rosterId ?? 0,
 });
 
 function localDate(milliseconds: number) {
@@ -105,9 +126,7 @@ export default function TradeDesk({
   );
   const [season, setSeason] = useState(currentSeason);
   const [trades, setTrades] = useState<LeagueTransaction[]>([]);
-  const [draft, setDraft] = useState<TradeDraft>(() =>
-    blankDraft(teamsBySeason[currentSeason] ?? []),
-  );
+  const [draft, setDraft] = useState<TradeDraft>(blankDraft);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{
@@ -137,7 +156,7 @@ export default function TradeDesk({
         .then((items) => {
           if (cancelled) return;
           setTrades(items);
-          setDraft(blankDraft(teamsBySeason[season] ?? []));
+          setDraft(blankDraft());
         })
         .catch((error) => {
           if (!cancelled) {
@@ -160,7 +179,7 @@ export default function TradeDesk({
   function selectTrade(id: string) {
     const transaction = trades.find((item) => item.id === id);
     if (!transaction) {
-      setDraft(blankDraft(teams));
+      setDraft(blankDraft());
       return;
     }
     const assets = transactionAssets(transaction);
@@ -169,6 +188,13 @@ export default function TradeDesk({
       date: localDate(transaction.created),
       week: transaction.week,
       assets,
+      draftPicks: transaction.draftPicks.map((pick) => ({
+        season: pick.season,
+        round: pick.round,
+        originalRosterId: pick.originalRosterId,
+        fromRosterId: pick.previousOwnerRosterId,
+        toRosterId: pick.ownerRosterId,
+      })),
     });
     setStatus(null);
   }
@@ -178,6 +204,15 @@ export default function TradeDesk({
       ...current,
       assets: current.assets.map((asset, assetIndex) =>
         assetIndex === index ? { ...asset, ...patch } : asset,
+      ),
+    }));
+  }
+
+  function updateDraftPick(index: number, patch: Partial<DraftPickAsset>) {
+    setDraft((current) => ({
+      ...current,
+      draftPicks: current.draftPicks.map((pick, pickIndex) =>
+        pickIndex === index ? { ...pick, ...patch } : pick,
       ),
     }));
   }
@@ -221,6 +256,7 @@ export default function TradeDesk({
           week: draft.week,
           created,
           assets: draft.assets,
+          draftPicks: draft.draftPicks,
         }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -281,8 +317,8 @@ export default function TradeDesk({
           <span>MANUAL LEAGUE LEDGER</span>
           <h2>Trade desk</h2>
           <p>
-            Add keeper-only trades or correct a Sleeper trade. These entries
-            update public trade history and Keeper Lab immediately.
+            Add keeper players, draft picks, or both—or correct a Sleeper
+            trade. Player moves update Keeper Lab immediately.
           </p>
         </div>
         <label>
@@ -349,7 +385,14 @@ export default function TradeDesk({
             </label>
           </div>
 
+          <div className="admin-trade-subheading">
+            <strong>Players</strong>
+            <span>Player moves update Keeper Lab ownership and timers.</span>
+          </div>
           <div className="admin-trade-assets">
+            {draft.assets.length === 0 && (
+              <p className="admin-trade-empty">No players in this trade.</p>
+            )}
             {draft.assets.map((asset, index) => {
               const options = playerOptions(asset);
               return (
@@ -395,7 +438,6 @@ export default function TradeDesk({
                     type="button"
                     className="admin-trade-remove"
                     onClick={() => setDraft((current) => ({ ...current, assets: current.assets.filter((_, assetIndex) => assetIndex !== index) }))}
-                    disabled={draft.assets.length === 1}
                     aria-label={`Remove traded player ${index + 1}`}
                   >
                     <Trash2 size={14} />
@@ -406,7 +448,149 @@ export default function TradeDesk({
           </div>
 
           <button type="button" className="admin-trade-add" onClick={() => setDraft((current) => ({ ...current, assets: [...current.assets, blankAsset(teams)] }))}>
-            <Plus size={14} /> Add another player
+            <Plus size={14} /> Add player
+          </button>
+
+          <div className="admin-trade-subheading admin-trade-subheading--picks">
+            <strong>Draft picks</strong>
+            <span>Track the original team, current sender, and recipient.</span>
+          </div>
+          <div className="admin-trade-assets">
+            {draft.draftPicks.length === 0 && (
+              <p className="admin-trade-empty">No draft picks in this trade.</p>
+            )}
+            {draft.draftPicks.map((pick, index) => {
+              const draftYears = Array.from(
+                { length: 4 },
+                (_, offset) => String(Number(season) + offset),
+              );
+              if (!draftYears.includes(pick.season)) {
+                draftYears.push(pick.season);
+              }
+              return (
+                <div
+                  className="admin-trade-asset admin-trade-pick"
+                  key={`${index}-${pick.season}-${pick.round}`}
+                >
+                  <label>
+                    <span>Draft</span>
+                    <select
+                      value={pick.season}
+                      onChange={(event) =>
+                        updateDraftPick(index, { season: event.target.value })
+                      }
+                    >
+                      {draftYears.map((year) => (
+                        <option value={year} key={year}>{year}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Round</span>
+                    <select
+                      value={pick.round}
+                      onChange={(event) =>
+                        updateDraftPick(index, {
+                          round: Number(event.target.value),
+                        })
+                      }
+                    >
+                      {Array.from({ length: 19 }, (_, round) => (
+                        <option value={round + 1} key={round + 1}>
+                          R{round + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Original team</span>
+                    <select
+                      value={pick.originalRosterId}
+                      onChange={(event) =>
+                        updateDraftPick(index, {
+                          originalRosterId: Number(event.target.value),
+                        })
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option value={team.rosterId} key={team.rosterId}>
+                          {team.teamName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>From</span>
+                    <select
+                      value={pick.fromRosterId}
+                      onChange={(event) =>
+                        updateDraftPick(index, {
+                          fromRosterId: Number(event.target.value),
+                        })
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option value={team.rosterId} key={team.rosterId}>
+                          {team.teamName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <ArrowRight className="admin-trade-arrow" size={17} />
+                  <label>
+                    <span>To</span>
+                    <select
+                      value={pick.toRosterId}
+                      onChange={(event) =>
+                        updateDraftPick(index, {
+                          toRosterId: Number(event.target.value),
+                        })
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option
+                          value={team.rosterId}
+                          disabled={team.rosterId === pick.fromRosterId}
+                          key={team.rosterId}
+                        >
+                          {team.teamName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="admin-trade-remove"
+                    onClick={() =>
+                      setDraft((current) => ({
+                        ...current,
+                        draftPicks: current.draftPicks.filter(
+                          (_, pickIndex) => pickIndex !== index,
+                        ),
+                      }))
+                    }
+                    aria-label={`Remove draft pick ${index + 1}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className="admin-trade-add"
+            onClick={() =>
+              setDraft((current) => ({
+                ...current,
+                draftPicks: [
+                  ...current.draftPicks,
+                  blankDraftPick(teams, season),
+                ],
+              }))
+            }
+          >
+            <Plus size={14} /> Add draft pick
           </button>
 
           <div className="admin-trade-actions">
@@ -416,7 +600,22 @@ export default function TradeDesk({
                 {selectedTrade.commissionerEdited ? "Restore Sleeper version" : "Delete manual trade"}
               </button>
             )}
-            <button type="button" className="admin-trade-save" onClick={saveTrade} disabled={saving || draft.assets.some((asset) => !asset.playerId || asset.fromRosterId === asset.toRosterId)}>
+            <button
+              type="button"
+              className="admin-trade-save"
+              onClick={saveTrade}
+              disabled={
+                saving ||
+                (draft.assets.length === 0 && draft.draftPicks.length === 0) ||
+                draft.assets.some(
+                  (asset) =>
+                    !asset.playerId || asset.fromRosterId === asset.toRosterId,
+                ) ||
+                draft.draftPicks.some(
+                  (pick) => pick.fromRosterId === pick.toRosterId,
+                )
+              }
+            >
               {saving ? <LoaderCircle className="spin" size={15} /> : <Save size={15} />}
               {draft.transactionId ? "Save trade changes" : "Add to league history"}
             </button>

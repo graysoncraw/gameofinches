@@ -6,7 +6,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 9;
+export const CHAOS_SCHEMA_VERSION = 10;
 
 export type WeeklyPlayerFact = {
   season: string;

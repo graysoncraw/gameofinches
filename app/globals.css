@@ -2334,6 +2334,40 @@ td {
   gap: 8px;
 }
 
+.admin-trade-subheading {
+  align-items: baseline;
+  border-top: 1px solid rgba(255, 253, 247, 0.14);
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.admin-trade-subheading:first-of-type {
+  margin-top: 0;
+}
+
+.admin-trade-subheading strong {
+  color: var(--orange);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.admin-trade-subheading span,
+.admin-trade-empty {
+  color: rgba(255, 253, 247, 0.42);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+}
+
+.admin-trade-empty {
+  background: rgba(255, 253, 247, 0.03);
+  border: 1px dashed rgba(255, 253, 247, 0.15);
+  margin: 8px 0 0;
+  padding: 14px;
+}
+
 .admin-trade-asset {
   align-items: end;
   background: rgba(255, 253, 247, 0.04);
@@ -2341,6 +2375,10 @@ td {
   gap: 10px;
   grid-template-columns: minmax(130px, 0.65fr) minmax(190px, 1fr) 18px minmax(130px, 0.65fr) 30px;
   padding: 12px;
+}
+
+.admin-trade-pick {
+  grid-template-columns: 80px 72px minmax(125px, 1fr) minmax(125px, 1fr) 18px minmax(125px, 1fr) 30px;
 }
 
 .admin-trade-arrow {
@@ -3807,6 +3845,10 @@ footer > a {
 
   .admin-trade-asset {
     grid-template-columns: minmax(120px, 0.7fr) minmax(190px, 1fr) 18px minmax(120px, 0.7fr) 30px;
+  }
+
+  .admin-trade-pick {
+    grid-template-columns: 80px 72px minmax(125px, 1fr) minmax(125px, 1fr) 18px minmax(125px, 1fr) 30px;
   }
 
   .admin-rules {

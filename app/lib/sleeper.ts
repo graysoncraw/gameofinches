@@ -323,6 +323,7 @@ export type LeagueTransaction = {
   draftPicks: Array<{
     season: string;
     round: number;
+    originalTeam?: string;
     from: string;
     to: string;
     originalRosterId: number;
@@ -1252,6 +1253,7 @@ async function loadTransactionFeed(
         draftPicks: (transaction.draft_picks ?? []).map((pick) => ({
           season: pick.season,
           round: pick.round,
+          originalTeam: teamName(pick.roster_id),
           from: teamName(pick.previous_owner_id),
           to: teamName(pick.owner_id),
           originalRosterId: pick.roster_id,

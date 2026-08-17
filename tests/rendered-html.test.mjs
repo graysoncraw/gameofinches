@@ -42,11 +42,12 @@ test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
 });
 
 test("protects commissioner writes with the shared password session", async () => {
-  const [auth, session, keepers, trades, adminPage] = await Promise.all([
+  const [auth, session, keepers, trades, tradeDesk, adminPage] = await Promise.all([
     file("app/lib/admin-auth.ts"),
     file("app/api/admin/session/route.ts"),
     file("app/api/admin/keepers/route.ts"),
     file("app/api/admin/transactions/route.ts"),
+    file("app/admin/TradeDesk.tsx"),
     file("app/admin/page.tsx"),
   ]);
 
@@ -61,6 +62,10 @@ test("protects commissioner writes with the shared password session", async () =
   assert.match(trades, /hasCommissionerRequest/);
   assert.match(trades, /isSameOrigin/);
   assert.match(trades, /saveCommissionerTransactionEdit/);
+  assert.match(trades, /validateDraftPick/);
+  assert.match(trades, /originalRosterId/);
+  assert.match(tradeDesk, /Add draft pick/);
+  assert.match(tradeDesk, /Original team/);
   assert.match(adminPage, /hasCommissionerSession/);
   await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
 });

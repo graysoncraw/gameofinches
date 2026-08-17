@@ -235,8 +235,11 @@ export default function TransactionHistory({
                     <div className="transaction-extras">
                       {transaction.draftPicks.map((pick, index) => (
                         <span key={`${pick.season}-${pick.round}-${index}`}>
-                          {pick.season} Round {pick.round}: {pick.from} →{" "}
-                          {pick.to}
+                          {pick.season} Round {pick.round}
+                          {pick.originalTeam
+                            ? ` · ${pick.originalTeam}'s pick`
+                            : ""}
+                          : {pick.from} → {pick.to}
                         </span>
                       ))}
                       {transaction.faabTransfers.map((transfer, index) => (
