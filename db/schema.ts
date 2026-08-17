@@ -82,6 +82,31 @@ export const adminLoginAttempts = pgTable("admin_login_attempts", {
     .default(0),
 });
 
+export const commissionerTransactionEdits = pgTable(
+  "commissioner_transaction_edits",
+  {
+    transactionId: text("transaction_id").primaryKey(),
+    season: text("season").notNull(),
+    kind: text("kind").notNull(),
+    dataJson: jsonb("data_json").notNull(),
+    updatedBy: text("updated_by").notNull().default("Commissioner"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("commissioner_transaction_edits_season_id_idx").on(
+      table.season,
+      table.transactionId,
+    ),
+  ],
+);
+
 export const sleeperWeeklyTeams = pgTable(
   "sleeper_weekly_teams",
   {

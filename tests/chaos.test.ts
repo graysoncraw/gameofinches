@@ -659,8 +659,16 @@ test("keeper candidates use final rosters and apply offseason trades", () => {
 });
 
 test("keeper candidates give in-season trades two keeper years", () => {
+  const currentSeason: Season = {
+    ...season,
+    year: "2026",
+    status: "pre_draft",
+    champion: null,
+    runnerUp: null,
+    thirdPlace: null,
+  };
   const inSeason: TransactionFeed = {
-    season: "2025",
+    season: "2026",
     counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
     transactions: [
       {
@@ -698,9 +706,9 @@ test("keeper candidates give in-season trades two keeper years", () => {
     ],
   };
   const candidates = buildKeeperCandidates(
-    [season],
+    [currentSeason, season],
     [],
-    { "2025": inSeason },
+    { "2026": inSeason },
   );
   const traded = candidates.find((candidate) => candidate.playerId === "p1");
   assert.equal(traded?.yearsRemaining, 2);

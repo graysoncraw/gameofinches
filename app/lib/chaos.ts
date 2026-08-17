@@ -1280,7 +1280,7 @@ export function buildKeeperCandidates(
           rosterId: side.rosterId,
           tradeTiming:
             transaction.type === "trade"
-              ? Number(season) > Number(sourceSeason.year)
+              ? transaction.week === 0
                 ? "offseason"
                 : "in-season"
               : null,
