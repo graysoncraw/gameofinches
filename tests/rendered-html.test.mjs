@@ -4,10 +4,14 @@ import test from "node:test";
 
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
-  const [sleeper, schema, transactions] = await Promise.all([
+test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
+  const [sleeper, schema, database, compose, dockerfile, transactions] =
+    await Promise.all([
     file("app/lib/sleeper.ts"),
     file("db/schema.ts"),
+    file("db/index.ts"),
+    file("compose.yaml"),
+    file("Dockerfile"),
     file("app/api/transactions/route.ts"),
   ]);
 
@@ -17,17 +21,33 @@ test("ships a D1-backed, twice-daily Sleeper snapshot", async () => {
   assert.match(sleeper, /T\$\{window\}:00:00-America\/Chicago/);
   assert.match(sleeper, /fetched_date === today/);
   assert.match(sleeper, /if \(cached\) return cached/);
+  assert.match(sleeper, /const archivedPlayerFacts = snapshot\.facts\?\.players/);
+  assert.match(sleeper, /playerFacts: archivedPlayerFacts\.length/);
+  assert.match(sleeper, /rosterFacts: archivedRosterFacts/);
   assert.match(sleeper, /losers_bracket/);
+  assert.match(sleeper, /\?::jsonb/);
   assert.match(schema, /sleeperPlayerCache/);
+  assert.match(schema, /pgTable/);
+  assert.match(schema, /jsonb/);
+  assert.match(database, /postgres/);
+  assert.match(database, /DATABASE_URL/);
+  assert.match(compose, /postgres:17-alpine/);
+  assert.match(compose, /condition: service_healthy/);
+  assert.match(dockerfile, /\.next\/standalone/);
+  assert.match(dockerfile, /scripts\/migrate\.mjs/);
   assert.match(transactions, /getTransactionFeed/);
   assert.doesNotMatch(transactions, /api\.sleeper\.app/);
+  assert.doesNotMatch(sleeper, /cloudflare:workers|D1Database/);
+  assert.doesNotMatch(database, /drizzle-orm\/d1/);
 });
 
 test("protects commissioner writes with the shared password session", async () => {
-  const [auth, session, keepers, adminPage] = await Promise.all([
+  const [auth, session, keepers, trades, tradeDesk, adminPage] = await Promise.all([
     file("app/lib/admin-auth.ts"),
     file("app/api/admin/session/route.ts"),
     file("app/api/admin/keepers/route.ts"),
+    file("app/api/admin/transactions/route.ts"),
+    file("app/admin/TradeDesk.tsx"),
     file("app/admin/page.tsx"),
   ]);
 
@@ -39,6 +59,13 @@ test("protects commissioner writes with the shared password session", async () =
   assert.match(session, /sameSite: "lax"/);
   assert.match(keepers, /hasCommissionerRequest/);
   assert.match(keepers, /isSameOrigin/);
+  assert.match(trades, /hasCommissionerRequest/);
+  assert.match(trades, /isSameOrigin/);
+  assert.match(trades, /saveCommissionerTransactionEdit/);
+  assert.match(trades, /validateDraftPick/);
+  assert.match(trades, /originalRosterId/);
+  assert.match(tradeDesk, /Add draft pick/);
+  assert.match(tradeDesk, /Original team/);
   assert.match(adminPage, /hasCommissionerSession/);
   await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
 });
@@ -74,7 +101,7 @@ test("includes the requested league records and keeper labels", async () => {
 });
 
 test("ships league records, superlatives, profiles, and the public Keeper Lab", async () => {
-  const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews] =
+  const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews, retiredTeams] =
     await Promise.all([
     file("app/lib/chaos.ts"),
     file("app/components/LeagueExtras.tsx"),
@@ -83,6 +110,7 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
     file("app/history/[view]/page.tsx"),
     file("app/records/[view]/page.tsx"),
     file("app/keepers/[view]/page.tsx"),
+    file("app/teams/retired/page.tsx"),
   ]);
 
   assert.match(chaos, /24 \* \(scoreA - expectedA\)/);
@@ -104,10 +132,13 @@ test("ships league records, superlatives, profiles, and the public Keeper Lab", 
   assert.match(dashboard, /\/history\/playoffs/);
   assert.match(dashboard, /\/records\/superlatives/);
   assert.match(dashboard, /\/keepers\/lab/);
+  assert.match(dashboard, /\/teams\/retired/);
+  assert.match(dashboard, /RETIRED TEAMS/);
   assert.match(historyViews, /history-seasons/);
   assert.match(historyViews, /history-playoffs/);
   assert.match(recordViews, /records-elo/);
   assert.match(keeperViews, /keepers-rules/);
+  assert.match(retiredTeams, /teams-retired/);
   assert.doesNotMatch(dashboard, /"chaos", "\/chaos", "Chaos"/);
   assert.doesNotMatch(dashboard, /DraftReportCards/);
   assert.doesNotMatch(dashboard, /TradeTrees/);
@@ -130,4 +161,12 @@ test("renders playoff history as a left-to-right bracket", async () => {
   assert.match(styles, /overflow-x: auto/);
   assert.match(styles, /playoff-bracket-match::after/);
   assert.doesNotMatch(playoffHistory, /playoff-round-list/);
+});
+
+test("ships the Game of Inches favicon", async () => {
+  const icon = await file("app/icon.svg");
+
+  assert.match(icon, /#0d1618/);
+  assert.match(icon, /#ff5a1f/);
+  assert.match(icon, />G<tspan[^>]*>\/<\/tspan>I</);
 });

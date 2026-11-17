@@ -21,6 +21,7 @@ import {
 } from "../lib/keeper-rules";
 import type { KeeperRecord } from "../lib/keepers";
 import type { Team } from "../lib/sleeper";
+import TradeDesk from "./TradeDesk";
 
 type KeeperDraft = {
   playerName: string;
@@ -303,6 +304,13 @@ export default function AdminPortal({
           {message.text}
         </div>
       )}
+
+      <TradeDesk
+        currentSeason={currentSeason}
+        seasons={editableSeasons}
+        teamsBySeason={teamsBySeason}
+        keeperCandidates={keeperCandidates}
+      />
 
       <div className="admin-layout">
         <section className="admin-team-list">

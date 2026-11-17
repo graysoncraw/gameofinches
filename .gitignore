@@ -15,18 +15,29 @@
 
 # next.js
 /.next/
-/.vinext/
 /out/
+
+# obsolete local build state from the pre-Docker runtime
+/.vinext/
+/.wrangler/
 
 # misc
 .DS_Store
 *.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.dump
+*.backup
+*.sql.gz
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -39,6 +50,6 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 /dist/
-/.wrangler/
 /outputs/
 /work/
+/backups/

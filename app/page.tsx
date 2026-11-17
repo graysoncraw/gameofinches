@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-html-link-for-pages -- keep page links compatible with the vinext runtime. */
+/* eslint-disable @next/next/no-html-link-for-pages -- navigation intentionally uses full-page links. */
 
 import LeagueDashboard from "./components/LeagueDashboard";
 import { getKeeperRecords } from "./lib/keepers";
@@ -47,6 +47,8 @@ function dataForPage(
           ? chaos.franchises.filter(
               (franchise) => franchise.userId === profileUserId,
             )
+          : activePage === "teams-retired"
+            ? chaos.franchises.filter((franchise) => !franchise.active)
           : [],
       keeperCandidates:
         activePage === "keepers-lab" ? chaos.keeperCandidates : [],

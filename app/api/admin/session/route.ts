@@ -3,11 +3,14 @@ import {
   COMMISSIONER_COOKIE,
   COMMISSIONER_SESSION_SECONDS,
   createCommissionerSession,
-  isSameOrigin,
   loginRateLimit,
   recordLoginAttempt,
   verifyCommissionerPassword,
 } from "../../../lib/admin-auth";
+import {
+  isSameOrigin,
+  isSecureRequest,
+} from "../../../lib/request-security";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(COMMISSIONER_COOKIE, await createCommissionerSession(), {
     httpOnly: true,
-    secure: new URL(request.url).protocol === "https:",
+    secure: isSecureRequest(request),
     sameSite: "lax",
     path: "/",
     maxAge: COMMISSIONER_SESSION_SECONDS,

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   hasCommissionerRequest,
-  isSameOrigin,
 } from "../../../lib/admin-auth";
+import { isSameOrigin } from "../../../lib/request-security";
 import {
   deleteKeeper,
   getKeeperRecords,

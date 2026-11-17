@@ -77,7 +77,7 @@ function fallbackMatchups(data: LeagueData, season: Season): DisplayMatchup[] {
         fallback: true,
       } satisfies DisplayMatchup;
     })
-    .filter((matchup): matchup is DisplayMatchup => Boolean(matchup))
+    .filter((matchup) => matchup !== null)
     .sort((a, b) => a.round - b.round || a.matchId - b.matchId);
 }
 
