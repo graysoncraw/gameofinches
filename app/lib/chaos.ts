@@ -6,7 +6,7 @@ import type {
   TransactionFeed,
 } from "./sleeper";
 
-export const CHAOS_SCHEMA_VERSION = 8;
+export const CHAOS_SCHEMA_VERSION = 10;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -114,6 +114,8 @@ export type FranchiseProfile = {
   manager: string;
   teamName: string;
   avatar: string | null;
+  active: boolean;
+  lastSeason: string;
   teamNames: Array<{ season: string; teamName: string }>;
   rosterHistory: Array<{
     season: string;
@@ -144,17 +146,25 @@ export type FranchiseProfile = {
     season: string;
     week: number;
   }>;
+  rosterHistory: FranchiseRosterHistory[];
   tradeCount: number;
   waiverCount: number;
   faabSpent: number;
 };
 
-export type FranchiseRosterPlayer = {
+export type RosterHistoryPlayer = {
   playerId: string;
   playerName: string;
   position: string;
   nflTeam: string;
-  starter: boolean;
+};
+
+export type FranchiseRosterHistory = {
+  season: string;
+  teamName: string;
+  finalWeek: number;
+  weekOne: RosterHistoryPlayer[];
+  finalRoster: RosterHistoryPlayer[];
 };
 
 export type KeeperCandidate = {
@@ -957,9 +967,13 @@ export function buildFranchises(
   elo: LeagueChaos["elo"],
   transactions: Record<string, TransactionFeed>,
   playerFacts: WeeklyPlayerFact[],
+  rosterFacts: WeeklyPlayerFact[] = [],
 ): FranchiseProfile[] {
   const teams = currentTeamMap(seasons);
   const completed = seasons.filter((season) => season.status === "complete");
+  const activeUserIds = new Set(
+    (seasons[0]?.teams ?? []).map((team) => team.userId),
+  );
   return [...teams.values()].map((current) => {
     const seasonTeams = seasons
       .map((season) => ({
@@ -1010,16 +1024,12 @@ export function buildFranchises(
     const favorite = [...opponents].sort(
       (a, b) => b.wins - b.losses - (a.wins - a.losses),
     )[0];
-    const feeds = Object.values(transactions).flatMap(
-      (feed) => feed.transactions,
-    );
-    const teamRosterIds = new Set(
-      seasonTeams.map((entry) => entry.team.rosterId),
-    );
-    const relevantSides = feeds.flatMap((transaction) =>
-      transaction.teams
-        .filter((side) => teamRosterIds.has(side.rosterId))
-        .map((side) => ({ transaction, side })),
+    const relevantSides = seasonTeams.flatMap((entry) =>
+      (transactions[entry.season]?.transactions ?? []).flatMap((transaction) =>
+        transaction.teams
+          .filter((side) => side.rosterId === entry.team.rosterId)
+          .map((side) => ({ transaction, side })),
+      ),
     );
     const finance = settledTeams.reduce(
       (sum, entry) => {
@@ -1093,6 +1103,8 @@ export function buildFranchises(
       manager: current.manager,
       teamName: current.teamName,
       avatar: current.avatar,
+      active: activeUserIds.has(current.userId),
+      lastSeason: seasonTeams[0]?.season ?? seasons[0]?.year ?? "",
       teamNames: seasonTeams.map((entry) => ({
         season: entry.season,
         teamName: entry.team.teamName,
@@ -1176,6 +1188,12 @@ export function buildFranchises(
           }
         : null,
       topPerformances: playerHighlights,
+      rosterHistory: buildFranchiseRosterHistory(
+        completed,
+        playerFacts,
+        rosterFacts,
+        current.userId,
+      ),
       tradeCount: relevantSides.filter(
         ({ transaction }) => transaction.type === "trade",
       ).length,
@@ -1190,6 +1208,74 @@ export function buildFranchises(
         ),
     };
   });
+}
+
+function rosterPlayers(facts: WeeklyPlayerFact[]): RosterHistoryPlayer[] {
+  const positionOrder = new Map(
+    ["QB", "RB", "WR", "TE", "K", "DEF"].map((position, index) => [
+      position,
+      index,
+    ]),
+  );
+  return facts
+    .map((fact) => ({
+      playerId: fact.playerId,
+      playerName: fact.playerName,
+      position: fact.position || "—",
+      nflTeam: fact.nflTeam || "FA",
+    }))
+    .sort(
+      (a, b) =>
+        (positionOrder.get(a.position) ?? 99) -
+          (positionOrder.get(b.position) ?? 99) ||
+        a.playerName.localeCompare(b.playerName),
+    );
+}
+
+export function buildFranchiseRosterHistory(
+  completedSeasons: Season[],
+  playerFacts: WeeklyPlayerFact[],
+  rosterFacts: WeeklyPlayerFact[],
+  userId: string,
+): FranchiseRosterHistory[] {
+  return completedSeasons
+    .map((season) => {
+      const weekOneFacts = playerFacts.filter(
+        (fact) =>
+          fact.userId === userId &&
+          fact.season === season.year &&
+          fact.week === 1,
+      );
+      const seasonPlayerFacts = playerFacts.filter(
+        (fact) => fact.userId === userId && fact.season === season.year,
+      );
+      const finalWeek = Math.max(
+        0,
+        ...seasonPlayerFacts.map((fact) => fact.week),
+      );
+      const exactFinalRoster = rosterFacts.filter(
+        (fact) => fact.userId === userId && fact.season === season.year,
+      );
+      const fallbackFinalRoster = seasonPlayerFacts.filter(
+        (fact) => fact.week === finalWeek,
+      );
+      const team = season.teams.find((item) => item.userId === userId);
+      if (!team || !weekOneFacts.length) return null;
+      return {
+        season: season.year,
+        teamName: team.teamName,
+        finalWeek,
+        weekOne: rosterPlayers(weekOneFacts),
+        finalRoster: rosterPlayers(
+          exactFinalRoster.length ? exactFinalRoster : fallbackFinalRoster,
+        ),
+      } satisfies FranchiseRosterHistory;
+    })
+    .filter(
+      (history): history is FranchiseRosterHistory =>
+        Boolean(history?.finalRoster.length),
+    )
+    .sort((a, b) => Number(b.season) - Number(a.season));
 }
 
 export function buildKeeperCandidates(
@@ -1284,7 +1370,7 @@ export function buildKeeperCandidates(
           rosterId: side.rosterId,
           tradeTiming:
             transaction.type === "trade"
-              ? Number(season) > Number(sourceSeason.year)
+              ? transaction.week === 0
                 ? "offseason"
                 : "in-season"
               : null,
@@ -1390,6 +1476,7 @@ export function buildLeagueChaos(input: ChaosInput): LeagueChaos {
       elo,
       input.transactions,
       input.playerFacts,
+      input.rosterFacts,
     ),
     keeperCandidates: buildKeeperCandidates(
       input.seasons,

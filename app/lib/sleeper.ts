@@ -7,6 +7,11 @@ import {
   type WeeklyPlayerFact,
   type WeeklyTeamFact,
 } from "./chaos";
+import {
+  getCommissionerTransactionEdits,
+  mergeCommissionerTransactionEdits,
+  mergeCommissionerTransactionRecord,
+} from "./transaction-edits";
 
 const SLEEPER_API = "https://api.sleeper.app/v1";
 const CURRENT_LEAGUE_ID = "1380998304963235840";
@@ -303,6 +308,8 @@ export type LeagueData = {
 export type LeagueTransaction = {
   id: string;
   type: "trade" | "waiver" | "free_agent";
+  source?: "sleeper" | "commissioner";
+  commissionerEdited?: boolean;
   week: number;
   created: number;
   waiverBid: number | null;
@@ -316,6 +323,7 @@ export type LeagueTransaction = {
   draftPicks: Array<{
     season: string;
     round: number;
+    originalTeam?: string;
     from: string;
     to: string;
     originalRosterId: number;
@@ -1223,6 +1231,8 @@ async function loadTransactionFeed(
       return {
         id: transaction.transaction_id,
         type: transaction.type,
+        source: "sleeper",
+        commissionerEdited: false,
         week: transaction.leg ?? 0,
         created: transaction.created,
         waiverBid: transaction.settings?.waiver_bid ?? null,
@@ -1243,6 +1253,7 @@ async function loadTransactionFeed(
         draftPicks: (transaction.draft_picks ?? []).map((pick) => ({
           season: pick.season,
           round: pick.round,
+          originalTeam: teamName(pick.roster_id),
           from: teamName(pick.previous_owner_id),
           to: teamName(pick.owner_id),
           originalRosterId: pick.roster_id,
@@ -1461,8 +1472,11 @@ async function getSnapshot(): Promise<LeagueSnapshot> {
   }
 }
 
-function addChaosFallback(snapshot: LeagueSnapshot) {
-  if (snapshot.data.chaos?.schemaVersion === CHAOS_SCHEMA_VERSION) {
+function addChaosFallback(snapshot: LeagueSnapshot, force = false) {
+  if (
+    !force &&
+    snapshot.data.chaos?.schemaVersion === CHAOS_SCHEMA_VERSION
+  ) {
     return snapshot;
   }
   const games = snapshot.data.rivalries.flatMap((rivalry) => rivalry.games);
@@ -1471,7 +1485,7 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       season.teams.map((team) => [`${season.year}:${team.userId}`, team] as const),
     ),
   );
-  const teamFacts: WeeklyTeamFact[] = games.flatMap((game, index) => {
+  const derivedTeamFacts: WeeklyTeamFact[] = games.flatMap((game, index) => {
     const teamA = teamsBySeason.get(`${game.season}:${game.managerAId}`);
     const teamB = teamsBySeason.get(`${game.season}:${game.managerBId}`);
     return [
@@ -1517,7 +1531,7 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       },
     ];
   });
-  const playerFacts: WeeklyPlayerFact[] = snapshot.data.topPerformances.map(
+  const derivedPlayerFacts: WeeklyPlayerFact[] = snapshot.data.topPerformances.map(
     (performance, index) => {
       const team = teamsBySeason.get(
         `${performance.season}:${performance.ownerId}`,
@@ -1536,20 +1550,31 @@ function addChaosFallback(snapshot: LeagueSnapshot) {
       };
     },
   );
+  const archivedTeamFacts = snapshot.facts?.teams ?? [];
+  const archivedPlayerFacts = snapshot.facts?.players ?? [];
+  const archivedRosterFacts = snapshot.facts?.rosters ?? [];
   snapshot.data.chaos = buildLeagueChaos({
     seasons: snapshot.data.seasons,
     games,
-    teamFacts,
-    playerFacts,
-    rosterFacts: snapshot.facts?.rosters ?? [],
+    teamFacts: archivedTeamFacts.length
+      ? archivedTeamFacts
+      : derivedTeamFacts,
+    playerFacts: archivedPlayerFacts.length
+      ? archivedPlayerFacts
+      : derivedPlayerFacts,
+    rosterFacts: archivedRosterFacts,
     transactions: snapshot.transactions,
-    archiveReady: false,
+    archiveReady: Boolean(
+      archivedTeamFacts.length &&
+        archivedPlayerFacts.length &&
+        archivedRosterFacts.length,
+    ),
   });
   return snapshot;
 }
 
 export async function getLeagueData(): Promise<LeagueData> {
-  return addChaosFallback(await getSnapshot()).data;
+  return (await getCommissionerSnapshot()).data;
 }
 
 export async function getTransactionFeed(
@@ -1558,5 +1583,28 @@ export async function getTransactionFeed(
   const snapshot = await getSnapshot();
   const feed = snapshot.transactions[season];
   if (!feed) throw new Error(`No Game of Inches league exists for ${season}.`);
-  return feed;
+  const db = getDatabase();
+  if (!db) return feed;
+  const edits = await getCommissionerTransactionEdits(db, season);
+  return edits.length ? mergeCommissionerTransactionEdits(feed, edits) : feed;
+}
+
+async function getCommissionerSnapshot(): Promise<LeagueSnapshot> {
+  const snapshot = await getSnapshot();
+  const db = getDatabase();
+  if (!db) return addChaosFallback(snapshot);
+
+  const edits = await getCommissionerTransactionEdits(db);
+  if (!edits.length) return addChaosFallback(snapshot);
+
+  const transactions = mergeCommissionerTransactionRecord(
+    snapshot.transactions,
+    edits,
+  );
+  const overlaid: LeagueSnapshot = {
+    ...snapshot,
+    transactions,
+    data: { ...snapshot.data },
+  };
+  return addChaosFallback(overlaid, true);
 }

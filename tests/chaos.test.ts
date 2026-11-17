@@ -4,6 +4,7 @@ import {
   buildDraftReports,
   buildElo,
   buildFranchises,
+  buildFranchiseRosterHistory,
   buildKeeperCandidates,
   buildRecordBook,
   buildSuperlatives,
@@ -151,6 +152,192 @@ test("optimal lineup respects duplicate QB and flex slots", () => {
     ),
     85,
   );
+});
+
+test("roster history compares Week 1 with the exact final roster", () => {
+  const fact = (
+    playerId: string,
+    playerName: string,
+    week: number,
+    position: string,
+  ): WeeklyPlayerFact => ({
+    season: "2025",
+    week,
+    rosterId: 1,
+    userId: "a",
+    playerId,
+    playerName,
+    position,
+    nflTeam: "AAA",
+    points: 0,
+    starter: false,
+  });
+  const weeklyFacts = [
+    fact("qb", "Opening Quarterback", 1, "QB"),
+    fact("gone", "Departed Receiver", 1, "WR"),
+    fact("qb", "Opening Quarterback", 17, "QB"),
+  ];
+  const finalRoster = [
+    fact("qb", "Opening Quarterback", 0, "QB"),
+    fact("new", "Late Running Back", 0, "RB"),
+  ];
+
+  const history = buildFranchiseRosterHistory(
+    [season],
+    weeklyFacts,
+    finalRoster,
+    "a",
+  );
+
+  assert.equal(history.length, 1);
+  assert.equal(history[0].season, "2025");
+  assert.equal(history[0].finalWeek, 17);
+  assert.deepEqual(
+    history[0].weekOne.map((player) => player.playerId),
+    ["qb", "gone"],
+  );
+  assert.deepEqual(
+    history[0].finalRoster.map((player) => player.playerId),
+    ["qb", "new"],
+  );
+});
+
+test("roster history falls back to the final recorded matchup roster", () => {
+  const facts: WeeklyPlayerFact[] = [
+    {
+      season: "2025",
+      week: 1,
+      rosterId: 1,
+      userId: "a",
+      playerId: "opening",
+      playerName: "Opening Player",
+      position: "WR",
+      nflTeam: "AAA",
+      points: 10,
+      starter: true,
+    },
+    {
+      season: "2025",
+      week: 16,
+      rosterId: 1,
+      userId: "a",
+      playerId: "closing",
+      playerName: "Closing Player",
+      position: "RB",
+      nflTeam: "BBB",
+      points: 12,
+      starter: true,
+    },
+  ];
+
+  const history = buildFranchiseRosterHistory([season], facts, [], "a");
+
+  assert.equal(history[0].finalWeek, 16);
+  assert.deepEqual(
+    history[0].finalRoster.map((player) => player.playerId),
+    ["closing"],
+  );
+});
+
+test("replacement managers do not inherit retired managers' transactions", () => {
+  const cam: Team = {
+    ...teamA,
+    rosterId: 10,
+    userId: "cam",
+    manager: "camaustin",
+    username: "camaustin",
+    teamName: "Nabers in Paris",
+  };
+  const brina: Team = {
+    ...teamA,
+    rosterId: 10,
+    userId: "brina",
+    manager: "brinacraw",
+    username: "brinacraw",
+    teamName: "brinacraw's Team",
+  };
+  const retiredSeason: Season = {
+    ...season,
+    teams: [cam],
+    champion: cam,
+    runnerUp: null,
+  };
+  const currentSeason: Season = {
+    ...season,
+    year: "2026",
+    status: "pre_draft",
+    teams: [brina],
+    champion: null,
+    runnerUp: null,
+    draft: null,
+  };
+  const camTransactions: TransactionFeed = {
+    season: "2025",
+    counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
+    transactions: [
+      {
+        id: "cam-trade",
+        type: "trade",
+        week: 8,
+        created: 1,
+        waiverBid: null,
+        teams: [
+          {
+            rosterId: 10,
+            teamName: cam.teamName,
+            manager: cam.manager,
+            adds: [],
+            drops: [],
+          },
+        ],
+        draftPicks: [],
+        faabTransfers: [],
+      },
+    ],
+  };
+
+  const profiles = buildFranchises(
+    [currentSeason, retiredSeason],
+    [],
+    [],
+    { standings: [], timeline: [] },
+    { "2025": camTransactions },
+    [],
+    [],
+  );
+  const camProfile = profiles.find((profile) => profile.userId === "cam");
+  const brinaProfile = profiles.find((profile) => profile.userId === "brina");
+
+  assert.equal(camProfile?.active, false);
+  assert.equal(camProfile?.lastSeason, "2025");
+  assert.equal(camProfile?.tradeCount, 1);
+  assert.equal(brinaProfile?.active, true);
+  assert.equal(brinaProfile?.tradeCount, 0);
+  assert.equal(brinaProfile?.waiverCount, 0);
+  assert.equal(brinaProfile?.faabSpent, 0);
+
+  const inheritedKeepers = buildKeeperCandidates(
+    [currentSeason, retiredSeason],
+    [],
+    {},
+    [
+      {
+        season: "2025",
+        week: 0,
+        rosterId: 10,
+        userId: "cam",
+        playerId: "inherited-player",
+        playerName: "Inherited Player",
+        position: "WR",
+        nflTeam: "AAA",
+        points: 0,
+        starter: false,
+      },
+    ],
+    true,
+  );
+  assert.equal(inheritedKeepers[0]?.userId, "brina");
+  assert.equal(inheritedKeepers[0]?.rosterId, 10);
 });
 
 test("Elo is chronological, symmetric, and starts at 1500", () => {
@@ -497,8 +684,16 @@ test("keeper candidates use final rosters and apply offseason trades", () => {
 });
 
 test("keeper candidates give in-season trades two keeper years", () => {
+  const currentSeason: Season = {
+    ...season,
+    year: "2026",
+    status: "pre_draft",
+    champion: null,
+    runnerUp: null,
+    thirdPlace: null,
+  };
   const inSeason: TransactionFeed = {
-    season: "2025",
+    season: "2026",
     counts: { all: 1, trade: 1, waiver: 0, free_agent: 0 },
     transactions: [
       {
@@ -535,7 +730,11 @@ test("keeper candidates give in-season trades two keeper years", () => {
       },
     ],
   };
-  const candidates = buildKeeperCandidates([season], [], { "2025": inSeason });
+  const candidates = buildKeeperCandidates(
+    [currentSeason, season],
+    [],
+    { "2026": inSeason },
+  );
   const traded = candidates.find((candidate) => candidate.playerId === "p1");
   assert.equal(traded?.yearsRemaining, 2);
   assert.equal(traded?.tradeTiming, "in-season");
@@ -579,11 +778,23 @@ test("keeper history keeps trade cost lineage but applies the correct timer", ()
     [previous],
     "2025",
   );
+  const expired = projectKeeperCandidate(
+    {
+      ...baseCandidate,
+      acquisitionType: "draft",
+      tradeTiming: null,
+    },
+    [previous],
+    "2025",
+  );
 
   assert.equal(inSeason.costRound, 5);
   assert.equal(inSeason.yearsRemaining, 2);
   assert.equal(offseason.costRound, 5);
   assert.equal(offseason.yearsRemaining, 3);
+  assert.equal(expired.yearsRemaining, 0);
+  assert.match(expired.source, /3 years previously/);
+  assert.doesNotMatch(expired.source, /1 year previously/);
 });
 
 test("two first-round keepers cannot coexist", () => {

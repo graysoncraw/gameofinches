@@ -8,6 +8,13 @@
       "when": 1785288170529,
       "tag": "0000_chilly_human_robot",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786926149577,
+      "tag": "0001_melted_vindicator",
+      "breakpoints": true
     }
   ]
 }

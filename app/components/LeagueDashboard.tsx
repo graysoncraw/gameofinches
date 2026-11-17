@@ -6,22 +6,21 @@ import {
   ArrowUpRight,
   CalendarDays,
   ChevronDown,
-  CircleDot,
   Clock3,
   Crown,
   DraftingCompass,
   Gauge,
   History,
   Medal,
-  RefreshCw,
   Search,
   ShieldCheck,
   Swords,
   Trophy,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { KeeperRecord } from "../lib/keepers";
+import { resolveDraftStart } from "../lib/league-dates";
 import type {
   AllTimeManager,
   DraftPick,
@@ -94,13 +93,65 @@ function standings(season: Season) {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const label = status.replace("_", " ");
+function DraftCountdown({
+  season,
+  startsAt,
+}: {
+  season: string;
+  startsAt: number;
+}) {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [startsAt]);
+
+  const remaining = now === null ? null : Math.max(0, startsAt - now);
+  const totalSeconds = remaining === null ? null : Math.floor(remaining / 1000);
+  const values = totalSeconds === null
+    ? ["--", "--", "--", "--"]
+    : [
+        String(Math.floor(totalSeconds / 86400)),
+        String(Math.floor((totalSeconds % 86400) / 3600)).padStart(2, "0"),
+        String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0"),
+        String(totalSeconds % 60).padStart(2, "0"),
+      ];
+  const draftDate = new Date(startsAt).toLocaleString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+    timeZoneName: "short",
+  });
+  const draftStarted = totalSeconds === 0;
+
   return (
-    <span className={`status-pill status-pill--${status}`}>
-      <CircleDot size={13} aria-hidden="true" />
-      {label}
-    </span>
+    <section className="draft-clock" aria-label={`${season} draft countdown`}>
+      <div className="draft-clock-date">
+        <span>
+          <Clock3 size={15} aria-hidden="true" /> {season} DRAFT NIGHT
+        </span>
+        <strong>{draftDate}</strong>
+      </div>
+      {draftStarted ? (
+        <div className="draft-clock-live">The draft is on the clock.</div>
+      ) : (
+        <div className="draft-clock-units" aria-label="Time remaining">
+          {values.map((value, index) => (
+            <div key={["days", "hours", "minutes", "seconds"][index]}>
+              <strong>{value}</strong>
+              <span>{["Days", "Hours", "Minutes", "Seconds"][index]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -184,6 +235,10 @@ export default function LeagueDashboard({
     (season) => season.status === "complete",
   );
   const latestCompleted = completedSeasons[0];
+  const draftStartsAt = resolveDraftStart(
+    current.year,
+    current.draft?.startTime,
+  );
   const [archiveYear, setArchiveYear] = useState(
     latestCompleted?.year ?? current.year,
   );
@@ -235,13 +290,6 @@ export default function LeagueDashboard({
   const mostPoints = [...data.allTime].sort(
     (a, b) => b.pointsFor - a.pointsFor,
   )[0];
-  const lastUpdated = new Date(data.fetchedAt).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/Chicago",
-  });
   const activeNav =
     activePage === "profile" ? "teams" : activePage.split("-")[0];
   const navigation: Array<{
@@ -251,7 +299,19 @@ export default function LeagueDashboard({
     items?: Array<{ href: string; label: string; page: string }>;
   }> = [
     { key: "overview", href: "/", label: "Overview" },
-    { key: "teams", href: "/teams", label: "Teams" },
+    {
+      key: "teams",
+      href: "/teams",
+      label: "Teams",
+      items: [
+        { href: "/teams", label: "Active teams", page: "teams" },
+        {
+          href: "/teams/retired",
+          label: "Retired teams",
+          page: "teams-retired",
+        },
+      ],
+    },
     {
       key: "history",
       href: "/history",
@@ -428,15 +488,16 @@ export default function LeagueDashboard({
 
       {activePage === "overview" && (
         <>
+      {draftStartsAt && (
+        <DraftCountdown
+          season={current.year}
+          startsAt={draftStartsAt}
+        />
+      )}
+
       <section className="hero" id="top">
         <div className="yard-lines" aria-hidden="true" />
         <div className="hero-copy">
-          <div className="eyebrow-row">
-            <StatusPill status={current.status} />
-            <span className="live-note">
-              <RefreshCw size={13} aria-hidden="true" /> Synced {lastUpdated}
-            </span>
-          </div>
           <p className="kicker">EST. 2023 · 10 FRANCHISES · 2 KEEPERS</p>
           <h1>
             Every inch
@@ -535,7 +596,7 @@ export default function LeagueDashboard({
       <section className="content-section" id="franchises">
         <div className="section-heading">
           <div>
-            <span className="section-number">01 / FRANCHISES</span>
+            <span className="section-number">01 / ACTIVE TEAMS</span>
             <h2>The ten in the room</h2>
           </div>
           <p>
@@ -579,6 +640,54 @@ export default function LeagueDashboard({
             </a>
           ))}
         </div>
+      </section>
+      )}
+
+      {activePage === "teams-retired" && (
+      <section className="content-section retired-franchises" id="retired-franchises">
+        <div className="section-heading">
+          <div>
+            <span className="section-number">02 / RETIRED TEAMS</span>
+            <h2>Gone, not forgotten.</h2>
+          </div>
+          <p>
+            Former managers keep their own records, transactions, players, and
+            roster history—even when a new owner inherits their old slot.
+          </p>
+        </div>
+
+        {data.chaos.franchises.length ? (
+          <div className="team-grid retired-team-grid">
+            {data.chaos.franchises.map((franchise, index) => (
+              <a
+                className="team-card retired-team-card"
+                href={`/teams/${franchise.userId}`}
+                key={franchise.userId}
+              >
+                <div className="team-card-top">
+                  <span className="roster-number">RETIRED FRANCHISE</span>
+                  <span className="team-index">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <TeamAvatar team={franchise} size="large" />
+                <div className="team-card-copy">
+                  <h3>{franchise.teamName}</h3>
+                  <p>@{franchise.manager}</p>
+                </div>
+                <div className="team-card-foot">
+                  <span>Through {franchise.lastSeason}</span>
+                  <span>{franchise.seasons} seasons</span>
+                </div>
+                <span className="team-dossier-link">
+                  Open archive <ArrowUpRight size={14} aria-hidden="true" />
+                </span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">No retired teams in the archive.</p>
+        )}
       </section>
       )}
 

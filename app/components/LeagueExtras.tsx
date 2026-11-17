@@ -23,13 +23,19 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { KeeperRecord } from "../lib/keepers";
-import type { FranchiseProfile, KeeperCandidate } from "../lib/chaos";
+import type {
+  FranchiseProfile,
+  FranchiseRosterHistory,
+  KeeperCandidate,
+  RosterHistoryPlayer,
+} from "../lib/chaos";
 import {
   FIRST_ROUND_CONFLICT_MESSAGE,
   hasFirstRoundKeeperConflict,
   projectKeeperCandidate,
 } from "../lib/keeper-rules";
 import type { LeagueData } from "../lib/sleeper";
+import { keeperDeadlineForSeason } from "../lib/league-dates";
 
 function number(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -277,9 +283,7 @@ export function KeeperWarRoom({
       ? chosen[index].costRound
       : Math.max(1, chosen[index].costRound - 1);
   };
-  const deadline = current.draft?.startTime
-    ? new Date(current.draft.startTime - 7 * 24 * 60 * 60 * 1000)
-    : null;
+  const deadline = keeperDeadlineForSeason(current.year);
 
   return (
     <section className="keeper-lab-section">
@@ -482,13 +486,21 @@ export function FranchiseDossier({
   const games = profile.wins + profile.losses + profile.ties;
   return (
     <section className="franchise-page">
-      <a className="franchise-back" href="/teams">
-        <ArrowLeft size={15} aria-hidden="true" /> All franchises
+      <a
+        className="franchise-back"
+        href={profile.active ? "/teams" : "/teams/retired"}
+      >
+        <ArrowLeft size={15} aria-hidden="true" />
+        {profile.active ? "Active teams" : "Retired teams"}
       </a>
       <div className="franchise-hero">
         <Initials name={profile.teamName} avatar={profile.avatar} />
         <div>
-          <span>FRANCHISE DOSSIER</span>
+          <span>
+            {profile.active
+              ? "ACTIVE FRANCHISE DOSSIER"
+              : `RETIRED AFTER ${profile.lastSeason}`}
+          </span>
           <h1>{profile.teamName}</h1>
           <p>{profile.manager}</p>
         </div>
@@ -568,20 +580,26 @@ export function FranchiseDossier({
               <strong>Transaction tendencies</strong>
             </div>
           </div>
-          <dl className="transaction-tendencies">
-            <div>
-              <dt>Trades</dt>
-              <dd>{profile.tradeCount}</dd>
-            </div>
-            <div>
-              <dt>Waiver wins</dt>
-              <dd>{profile.waiverCount}</dd>
-            </div>
-            <div>
-              <dt>FAAB spent</dt>
-              <dd>${profile.faabSpent}</dd>
-            </div>
-          </dl>
+          {profile.tradeCount || profile.waiverCount || profile.faabSpent ? (
+            <dl className="transaction-tendencies">
+              <div>
+                <dt>Trades</dt>
+                <dd>{profile.tradeCount}</dd>
+              </div>
+              <div>
+                <dt>Waiver wins</dt>
+                <dd>{profile.waiverCount}</dd>
+              </div>
+              <div>
+                <dt>FAAB spent</dt>
+                <dd>${profile.faabSpent}</dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="profile-empty">
+              No transactions recorded for this manager yet.
+            </p>
+          )}
         </article>
       </div>
       <div className="franchise-timeline">
@@ -599,61 +617,7 @@ export function FranchiseDossier({
           </div>
         ))}
       </div>
-      <section className="roster-history">
-        <div className="panel-title">
-          <Users size={19} aria-hidden="true" />
-          <div>
-            <span>ROSTER TIME MACHINE</span>
-            <strong>Opening and closing rosters</strong>
-          </div>
-        </div>
-        <p className="roster-history-note">
-          Opening rosters use each seasonâ€™s earliest recorded matchup week;
-          closing rosters use its latest recorded matchup week.
-        </p>
-        {profile.rosterHistory.length ? (
-          profile.rosterHistory.map((season) => (
-            <details className="roster-season" key={season.season}>
-              <summary>
-                <span>{season.season}</span>
-                <strong>{season.teamName}</strong>
-                <small>{season.opening.length} players</small>
-              </summary>
-              <div className="roster-snapshots">
-                {(
-                  [
-                    ["Opening roster", season.openingWeek, season.opening],
-                    ["Closing roster", season.closingWeek, season.closing],
-                  ] as const
-                ).map(([label, week, players]) => (
-                  <article key={label}>
-                    <header>
-                      <strong>{label}</strong>
-                      <span>Week {week}</span>
-                    </header>
-                    <div className="roster-player-list">
-                      {players.map((player) => (
-                        <div key={player.playerId}>
-                          <span>{player.position || "â€”"}</span>
-                          <strong>{player.playerName}</strong>
-                          <small>
-                            {player.nflTeam || "FA"}
-                            {player.starter ? " Â· starter" : ""}
-                          </small>
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </details>
-          ))
-        ) : (
-          <p className="profile-empty">
-            No weekly roster history is available.
-          </p>
-        )}
-      </section>
+      <RosterTimeMachine history={profile.rosterHistory} />
       <div className="franchise-two-up">
         <article>
           <div className="panel-title">
@@ -703,6 +667,120 @@ export function FranchiseDossier({
             <p className="profile-empty">No recorded keeper history.</p>
           )}
         </article>
+      </div>
+    </section>
+  );
+}
+
+function RosterSnapshot({
+  title,
+  subtitle,
+  players,
+  compareTo,
+  changeLabel,
+}: {
+  title: string;
+  subtitle: string;
+  players: RosterHistoryPlayer[];
+  compareTo: Set<string>;
+  changeLabel: "Joined" | "Departed";
+}) {
+  return (
+    <article className="roster-snapshot">
+      <header>
+        <div>
+          <span>{subtitle}</span>
+          <strong>{title}</strong>
+        </div>
+        <b>{players.length} players</b>
+      </header>
+      <div className="roster-player-list">
+        {players.map((player) => {
+          const changed = !compareTo.has(player.playerId);
+          return (
+            <div className="roster-player-row" key={player.playerId}>
+              <span className={`roster-position roster-position--${player.position.toLowerCase()}`}>
+                {player.position}
+              </span>
+              <strong>{player.playerName}</strong>
+              <small>{player.nflTeam}</small>
+              {changed && (
+                <em className={`roster-change roster-change--${changeLabel.toLowerCase()}`}>
+                  {changeLabel}
+                </em>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+function RosterTimeMachine({ history }: { history: FranchiseRosterHistory[] }) {
+  const [selectedSeason, setSelectedSeason] = useState(
+    history[0]?.season ?? "",
+  );
+  const selected =
+    history.find((item) => item.season === selectedSeason) ?? history[0];
+
+  if (!selected) return null;
+  const weekOneIds = new Set(selected.weekOne.map((player) => player.playerId));
+  const finalIds = new Set(
+    selected.finalRoster.map((player) => player.playerId),
+  );
+  const joined = selected.finalRoster.filter(
+    (player) => !weekOneIds.has(player.playerId),
+  ).length;
+  const departed = selected.weekOne.filter(
+    (player) => !finalIds.has(player.playerId),
+  ).length;
+
+  return (
+    <section className="roster-history">
+      <div className="roster-history-heading">
+        <div className="panel-title">
+          <CalendarDays size={19} aria-hidden="true" />
+          <div>
+            <span>ROSTER TIME MACHINE</span>
+            <strong>Opening day to final whistle</strong>
+          </div>
+        </div>
+        <label>
+          <span>Season</span>
+          <select
+            aria-label="Roster history season"
+            value={selected.season}
+            onChange={(event) => setSelectedSeason(event.target.value)}
+          >
+            {history.map((item) => (
+              <option value={item.season} key={item.season}>
+                {item.season} · {item.teamName}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="roster-turnover">
+        <span>{joined} joined during the season</span>
+        <span>{departed} departed</span>
+        <small>Final roster captured from Sleeper after Week {selected.finalWeek}</small>
+      </div>
+      <div className="roster-snapshot-grid">
+        <RosterSnapshot
+          title="Week 1 roster"
+          subtitle={`${selected.season} · OPENING SNAPSHOT`}
+          players={selected.weekOne}
+          compareTo={finalIds}
+          changeLabel="Departed"
+        />
+        <RosterSnapshot
+          title="End-of-season roster"
+          subtitle={`${selected.season} · FINAL SNAPSHOT`}
+          players={selected.finalRoster}
+          compareTo={weekOneIds}
+          changeLabel="Joined"
+        />
       </div>
     </section>
   );
