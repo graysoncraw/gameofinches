@@ -99,6 +99,14 @@ can be rebuilt, but commissioner keeper edits cannot be recreated from Sleeper.
 - Failed refreshes keep serving the previous snapshot and retry after 15
   minutes.
 - The Sleeper player directory refreshes no more than once daily.
+- Sleeper's NFL scoring leg selects the current week. Only finalized weeks feed
+  historical results and analytics; current scores have their own scoreboard.
+- The homepage generates a new weekly recap from completed results, including
+  the points leader, closest finish, and best starter. It needs no manual edits
+  or external text-generation service. Open homepages refresh after a sync window.
+- Snapshot data and its weekly facts are saved together in one transaction.
+- Without PostgreSQL, local previews reuse an in-memory snapshot for each sync
+  window instead of requesting the full archive on every page.
 - Completed seasons are retained; routine syncs replace only the current
   season.
 - Historical keeper records are seeded when missing. Commissioner edits are
@@ -140,9 +148,15 @@ and PostgreSQL-backed login rate limiting.
 ## Project structure
 
 - `app/components/` — public league views and interactive tools
+- `app/components/LeagueDashboard.tsx` — server-rendered page shell; navigation,
+  drafts, season selection, and keepers have independent interactive components
 - `app/admin/` — authenticated Commissioner Desk
 - `app/api/` — keeper, session, health, and cached transaction endpoints
-- `app/lib/sleeper.ts` — Sleeper ingestion and synchronization
+- `app/lib/sleeper.ts` — snapshot orchestration and public data access
+- `app/lib/sleeper/` — API client, ingestion, analytics, sync schedule, and snapshot storage
+- `app/lib/league-types.ts` — shared league models used by server and UI
+- `app/lib/weekly-update.ts` — week selection, matchups, and weekly recap rules
+- `app/reset.css` and `app/weekly.css` — shared defaults and the weekly homepage
 - `app/lib/chaos.ts` — derived records, Elo, and superlatives
 - `db/` and `drizzle/` — PostgreSQL client, schema, and migrations
 - `scripts/migrate.mjs` — idempotent migration runner used at container startup
@@ -158,3 +172,16 @@ npm run build
 npm run check
 npm audit --omit=dev
 ```
+
+To check a running local server's public pages, build assets, team profiles,
+and transaction feed:
+
+```bash
+npm run test:smoke
+# For another address:
+SMOKE_BASE_URL=http://127.0.0.1:3100 npm run test:smoke
+```
+
+Set `SLEEPER_LEAGUE_ID` in `.env` when the league rolls over to a new Sleeper
+season. The default is the 2026 Game of Inches league. The prior-season chain
+remains available through Sleeper's `previous_league_id` links.

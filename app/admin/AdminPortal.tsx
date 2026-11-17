@@ -20,7 +20,7 @@ import {
   projectKeeperCandidate,
 } from "../lib/keeper-rules";
 import type { KeeperRecord } from "../lib/keepers";
-import type { Team } from "../lib/sleeper";
+import type { Team } from "../lib/league-types";
 import TradeDesk from "./TradeDesk";
 
 type KeeperDraft = {

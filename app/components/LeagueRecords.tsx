@@ -2,7 +2,8 @@
 
 import { Banknote, ChevronDown, Flame, Swords, Trophy } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { LeagueData } from "../lib/sleeper";
+import { formatPoints as points } from "../lib/league-format";
+import type { LeagueData } from "../lib/league-types";
 
 function money(value: number, signed = false) {
   const prefix = signed && value > 0 ? "+" : "";
@@ -11,13 +12,6 @@ function money(value: number, signed = false) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value)}`;
-}
-
-function points(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
 }
 
 export default function LeagueRecords({
@@ -52,8 +46,7 @@ export default function LeagueRecords({
     (item) =>
       (item.managerA.userId === managerA &&
         item.managerB.userId === managerB) ||
-      (item.managerA.userId === managerB &&
-        item.managerB.userId === managerA),
+      (item.managerA.userId === managerB && item.managerB.userId === managerA),
   );
   const reversed = rivalry?.managerA.userId !== managerA;
   const sideA = rivalry
@@ -123,202 +116,212 @@ export default function LeagueRecords({
       </div>
 
       {view === "money" && (
-      <div className="money-panel">
-        <div className="records-title">
-          <div>
-            <Banknote size={22} aria-hidden="true" />
-            <span>SETTLED THROUGH 2025</span>
+        <div className="money-panel">
+          <div className="records-title">
+            <div>
+              <Banknote size={22} aria-hidden="true" />
+              <span>SETTLED THROUGH 2025</span>
+            </div>
+            <strong>League money ledger</strong>
           </div>
-          <strong>League money ledger</strong>
-        </div>
-        <div className="money-layout">
-          <div className="table-shell money-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Manager</th>
-                  <th className="numeric">Buy-ins</th>
-                  <th className="numeric">Won</th>
-                  <th className="numeric">Net</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.finances.managers.map((manager) => (
-                  <tr key={manager.userId}>
-                    <td>
-                      <strong>{manager.teamName}</strong>
-                      <span>@{manager.manager}</span>
-                    </td>
-                    <td className="numeric">{money(manager.buyIns)}</td>
-                    <td className="numeric">{money(manager.winnings)}</td>
-                    <td
-                      className={`numeric money-net ${
-                        manager.net > 0
-                          ? "positive"
-                          : manager.net < 0
-                            ? "negative"
-                            : ""
-                      }`}
-                    >
-                      {money(manager.net, true)}
-                    </td>
+          <div className="money-layout">
+            <div className="table-shell money-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Manager</th>
+                    <th className="numeric">Buy-ins</th>
+                    <th className="numeric">Won</th>
+                    <th className="numeric">Net</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.finances.managers.map((manager) => (
+                    <tr key={manager.userId}>
+                      <td>
+                        <strong>{manager.teamName}</strong>
+                        <span>@{manager.manager}</span>
+                      </td>
+                      <td className="numeric">{money(manager.buyIns)}</td>
+                      <td className="numeric">{money(manager.winnings)}</td>
+                      <td
+                        className={`numeric money-net ${
+                          manager.net > 0
+                            ? "positive"
+                            : manager.net < 0
+                              ? "negative"
+                              : ""
+                        }`}
+                      >
+                        {money(manager.net, true)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pending && (
+              <aside className="pending-purse">
+                <span>{pending.year} PRIZE POOL</span>
+                <strong>{money(pending.prizePool)}</strong>
+                <p>{money(pending.buyIn)} per franchise · pending</p>
+                <dl>
+                  <div>
+                    <dt>Champion</dt>
+                    <dd>{money(pending.first)}</dd>
+                  </div>
+                  <div>
+                    <dt>Runner-up</dt>
+                    <dd>{money(pending.second)}</dd>
+                  </div>
+                  <div>
+                    <dt>Third place</dt>
+                    <dd>{money(pending.third)}</dd>
+                  </div>
+                </dl>
+              </aside>
+            )}
           </div>
-          {pending && (
-            <aside className="pending-purse">
-              <span>{pending.year} PRIZE POOL</span>
-              <strong>{money(pending.prizePool)}</strong>
-              <p>{money(pending.buyIn)} per franchise · pending</p>
-              <dl>
-                <div>
-                  <dt>Champion</dt>
-                  <dd>{money(pending.first)}</dd>
-                </div>
-                <div>
-                  <dt>Runner-up</dt>
-                  <dd>{money(pending.second)}</dd>
-                </div>
-                <div>
-                  <dt>Third place</dt>
-                  <dd>{money(pending.third)}</dd>
-                </div>
-              </dl>
-            </aside>
-          )}
         </div>
-      </div>
       )}
 
       {view === "rivalries" && (
-      <div className="rivalry-panel">
-        <div className="records-title">
-          <div>
-            <Swords size={22} aria-hidden="true" />
-            <span>HEAD TO HEAD</span>
+        <div className="rivalry-panel">
+          <div className="records-title">
+            <div>
+              <Swords size={22} aria-hidden="true" />
+              <span>HEAD TO HEAD</span>
+            </div>
+            <strong>Choose your enemies</strong>
           </div>
-          <strong>Choose your enemies</strong>
-        </div>
-        <div className="rivalry-selectors">
-          <label className="select-shell">
-            <span className="sr-only">First manager</span>
-            <select value={managerA} onChange={(event) => chooseA(event.target.value)}>
-              {managers
-                .filter((manager) => manager.userId !== managerB)
-                .map((manager) => (
-                  <option value={manager.userId} key={manager.userId}>
-                    {manager.manager}
-                  </option>
-                ))}
-            </select>
-            <ChevronDown size={16} aria-hidden="true" />
-          </label>
-          <span>VS</span>
-          <label className="select-shell">
-            <span className="sr-only">Second manager</span>
-            <select value={managerB} onChange={(event) => chooseB(event.target.value)}>
-              {managers
-                .filter((manager) => manager.userId !== managerA)
-                .map((manager) => (
-                  <option value={manager.userId} key={manager.userId}>
-                    {manager.manager}
-                  </option>
-                ))}
-            </select>
-            <ChevronDown size={16} aria-hidden="true" />
-          </label>
-        </div>
+          <div className="rivalry-selectors">
+            <label className="select-shell">
+              <span className="sr-only">First manager</span>
+              <select
+                value={managerA}
+                onChange={(event) => chooseA(event.target.value)}
+              >
+                {managers
+                  .filter((manager) => manager.userId !== managerB)
+                  .map((manager) => (
+                    <option value={manager.userId} key={manager.userId}>
+                      {manager.manager}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" />
+            </label>
+            <span>VS</span>
+            <label className="select-shell">
+              <span className="sr-only">Second manager</span>
+              <select
+                value={managerB}
+                onChange={(event) => chooseB(event.target.value)}
+              >
+                {managers
+                  .filter((manager) => manager.userId !== managerA)
+                  .map((manager) => (
+                    <option value={manager.userId} key={manager.userId}>
+                      {manager.manager}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" />
+            </label>
+          </div>
 
-        {rivalry ? (
-          <>
-            <div className="rivalry-score">
-              <div>
-                <span>{sideA?.teamName}</span>
-                <strong>{winsA}</strong>
-                <small>{points(pointsA)} total points</small>
+          {rivalry ? (
+            <>
+              <div className="rivalry-score">
+                <div>
+                  <span>{sideA?.teamName}</span>
+                  <strong>{winsA}</strong>
+                  <small>{points(pointsA)} total points</small>
+                </div>
+                <div className="rivalry-center">
+                  <span>ALL TIME</span>
+                  <strong>
+                    {rivalry.games.length} game
+                    {rivalry.games.length === 1 ? "" : "s"}
+                  </strong>
+                  <small>
+                    {rivalry.ties ? `${rivalry.ties} tied` : "No ties"}
+                  </small>
+                </div>
+                <div>
+                  <span>{sideB?.teamName}</span>
+                  <strong>{winsB}</strong>
+                  <small>{points(pointsB)} total points</small>
+                </div>
               </div>
-              <div className="rivalry-center">
-                <span>ALL TIME</span>
-                <strong>
-                  {rivalry.games.length} game
-                  {rivalry.games.length === 1 ? "" : "s"}
-                </strong>
-                <small>{rivalry.ties ? `${rivalry.ties} tied` : "No ties"}</small>
+              <div className="rivalry-games">
+                {rivalry.games.map((game) => {
+                  const gameReversed = game.managerAId !== managerA;
+                  return (
+                    <div key={`${game.season}-${game.week}`}>
+                      <span>
+                        {game.season} · Week {game.week}
+                        {game.postseason ? " · Postseason" : ""}
+                      </span>
+                      <strong>
+                        {points(gameReversed ? game.pointsB : game.pointsA)}
+                        <i>—</i>
+                        {points(gameReversed ? game.pointsA : game.pointsB)}
+                      </strong>
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <span>{sideB?.teamName}</span>
-                <strong>{winsB}</strong>
-                <small>{points(pointsB)} total points</small>
-              </div>
-            </div>
-            <div className="rivalry-games">
-              {rivalry.games.map((game) => {
-                const gameReversed = game.managerAId !== managerA;
-                return (
-                  <div key={`${game.season}-${game.week}`}>
-                    <span>
-                      {game.season} · Week {game.week}
-                      {game.postseason ? " · Postseason" : ""}
-                    </span>
-                    <strong>
-                      {points(gameReversed ? game.pointsB : game.pointsA)}
-                      <i>—</i>
-                      {points(gameReversed ? game.pointsA : game.pointsB)}
-                    </strong>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <div className="rivalry-empty">These two have not met yet.</div>
-        )}
-      </div>
+            </>
+          ) : (
+            <div className="rivalry-empty">These two have not met yet.</div>
+          )}
+        </div>
       )}
 
       {view === "performances" && (
-      <div className="performances-panel">
-        <div className="records-title">
-          <div>
-            <Flame size={22} aria-hidden="true" />
-            <span>TOP 10 STARTER SCORES</span>
+        <div className="performances-panel">
+          <div className="records-title">
+            <div>
+              <Flame size={22} aria-hidden="true" />
+              <span>TOP 10 STARTER SCORES</span>
+            </div>
+            <strong>Sunday detonations</strong>
           </div>
-          <strong>Sunday detonations</strong>
-        </div>
-        <div className="performance-list">
-          {data.topPerformances.map((performance, index) => (
-            <article key={`${performance.season}-${performance.week}-${performance.playerId}`}>
-              <span className="performance-rank">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <div className="performance-player">
-                <span>{performance.position || "FLEX"}</span>
-                <div>
-                  <strong>{performance.playerName}</strong>
+          <div className="performance-list">
+            {data.topPerformances.map((performance, index) => (
+              <article
+                key={`${performance.season}-${performance.week}-${performance.playerId}`}
+              >
+                <span className="performance-rank">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="performance-player">
+                  <span>{performance.position || "FLEX"}</span>
+                  <div>
+                    <strong>{performance.playerName}</strong>
+                    <small>
+                      {performance.season} · Week {performance.week}
+                      {performance.postseason ? " · Postseason" : ""}
+                    </small>
+                  </div>
+                </div>
+                <div className="performance-owner">
+                  <span>Owned by</span>
+                  <strong>{performance.teamName}</strong>
                   <small>
-                    {performance.season} · Week {performance.week}
-                    {performance.postseason ? " · Postseason" : ""}
+                    @{performance.owner} vs. {performance.opponentTeam}
                   </small>
                 </div>
-              </div>
-              <div className="performance-owner">
-                <span>Owned by</span>
-                <strong>{performance.teamName}</strong>
-                <small>
-                  @{performance.owner} vs. {performance.opponentTeam}
-                </small>
-              </div>
-              <div className="performance-points">
-                <Trophy size={16} aria-hidden="true" />
-                <strong>{points(performance.points)}</strong>
-                <span>PTS</span>
-              </div>
-            </article>
-          ))}
+                <div className="performance-points">
+                  <Trophy size={16} aria-hidden="true" />
+                  <strong>{points(performance.points)}</strong>
+                  <span>PTS</span>
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
-      </div>
       )}
     </section>
   );

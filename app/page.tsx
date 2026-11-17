@@ -3,7 +3,7 @@
 import LeagueDashboard from "./components/LeagueDashboard";
 import { getKeeperRecords } from "./lib/keepers";
 import { getLeagueData } from "./lib/sleeper";
-import type { LeagueData } from "./lib/sleeper";
+import type { LeagueData } from "./lib/league-types";
 
 export const dynamic = "force-dynamic";
 

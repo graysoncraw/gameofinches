@@ -1,0 +1,226 @@
+.weekly-section {
+  padding: 64px clamp(20px, 5vw, 76px) 48px;
+  scroll-margin-top: 96px;
+}
+
+.weekly-heading {
+  align-items: end;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.weekly-heading .section-number,
+.weekly-eyebrow {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.weekly-heading h2 {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 4vw, 56px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  margin: 12px 0 0;
+}
+
+.weekly-heading > p {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.weekly-recap {
+  background: var(--ink);
+  color: var(--white);
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  margin-bottom: 28px;
+}
+
+.weekly-recap-intro {
+  padding: clamp(24px, 3vw, 42px);
+}
+.weekly-eyebrow {
+  color: var(--mint);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.weekly-recap h3 {
+  font-size: clamp(26px, 3vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  margin: 20px 0 16px;
+}
+.weekly-recap p {
+  color: rgba(255, 253, 247, 0.75);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+}
+.weekly-highlights {
+  border-left: 1px solid rgba(255, 253, 247, 0.18);
+}
+.weekly-highlights > div {
+  padding: 22px 28px;
+}
+.weekly-highlights > div + div {
+  border-top: 1px solid rgba(255, 253, 247, 0.18);
+}
+.weekly-highlights span {
+  color: var(--orange-soft);
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+.weekly-tables {
+  align-items: start;
+  border: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+}
+.weekly-scoreboard {
+  border-right: 1px solid var(--line);
+}
+.weekly-table-head {
+  align-items: center;
+  background: var(--paper-deep);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 20px 24px;
+}
+.weekly-table-head h3 {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+}
+.weekly-table-head > span {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.weekly-matchup {
+  border-top: 1px solid var(--line);
+  padding: 15px 24px 18px;
+}
+.matchup-status {
+  color: var(--muted);
+  display: block;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+.weekly-matchup > div {
+  align-items: baseline;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+.weekly-matchup a,
+.weekly-standings li a {
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.weekly-matchup a:hover,
+.weekly-standings a:hover {
+  color: var(--orange);
+}
+.weekly-matchup strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.weekly-standings ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.weekly-standings li {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 22px minmax(0, 1fr) 48px 65px;
+  padding: 17px 24px;
+}
+.weekly-rank {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+.weekly-record {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+.weekly-standings li strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  text-align: right;
+}
+.weekly-all-teams {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  font-size: 11px;
+  font-weight: 800;
+  gap: 10px;
+  padding: 20px 24px;
+  text-decoration: none;
+}
+.weekly-sync {
+  color: var(--muted);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  line-height: 1.7;
+  margin: 18px 0 0;
+}
+.weekly-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  padding: 28px 24px;
+}
+
+@media (max-width: 760px) {
+  .weekly-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .weekly-heading > p {
+    margin: 0;
+  }
+  .weekly-recap,
+  .weekly-tables {
+    grid-template-columns: 1fr;
+  }
+  .weekly-highlights {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 253, 247, 0.18);
+  }
+  .weekly-scoreboard {
+    border-right: 0;
+  }
+  .weekly-standings {
+    border-top: 1px solid var(--line);
+  }
+  .weekly-standings li {
+    gap: 8px;
+    grid-template-columns: 20px minmax(0, 1fr) 42px 60px;
+    padding: 17px 18px;
+  }
+}
