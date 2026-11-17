@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildDraftReports,
   buildElo,
+  buildFranchises,
   buildKeeperCandidates,
   buildRecordBook,
   buildSuperlatives,
@@ -189,20 +190,14 @@ test("record book excludes unplayed zero games and tracks bench gaps", () => {
     },
   ];
   const records = buildRecordBook(
-    [
-      game,
-      { ...game, week: 2, pointsA: 0, pointsB: 0, winnerId: null },
-    ],
+    [game, { ...game, week: 2, pointsA: 0, pointsB: 0, winnerId: null }],
     teamFacts,
   );
   assert.equal(
     records.find((record) => record.id === "highest-team-score")?.value,
     120,
   );
-  assert.equal(
-    records.find((record) => record.id === "bench-gap")?.value,
-    30,
-  );
+  assert.equal(records.find((record) => record.id === "bench-gap")?.value, 30);
 });
 
 test("Scoreboard Bully counts tied weekly highs and excludes zero weeks", () => {
@@ -244,14 +239,9 @@ test("Scoreboard Bully counts tied weekly highs and excludes zero weeks", () => 
     ["a", teamA],
     ["b", teamB],
   ]);
-  const tiedAward = buildSuperlatives(
-    [],
-    teamFacts,
-    [],
-    {},
-    [],
-    teams,
-  ).find((award) => award.id === "scoreboard-bully");
+  const tiedAward = buildSuperlatives([], teamFacts, [], {}, [], teams).find(
+    (award) => award.id === "scoreboard-bully",
+  );
 
   assert.equal(tiedAward?.manager, "Alpha");
   assert.equal(tiedAward?.value, "2 weekly highs");
@@ -291,14 +281,9 @@ test("Nail-Biter King counts wins by five points or fewer", () => {
     ["a", teamA],
     ["b", teamB],
   ]);
-  const award = buildSuperlatives(
-    closeGames,
-    [],
-    [],
-    {},
-    [],
-    teams,
-  ).find((item) => item.id === "nail-biter-king");
+  const award = buildSuperlatives(closeGames, [], [], {}, [], teams).find(
+    (item) => item.id === "nail-biter-king",
+  );
 
   assert.equal(award?.manager, "Alpha");
   assert.equal(award?.value, "2 close wins");
@@ -346,6 +331,47 @@ test("draft grades exclude keeper picks and remain transparent", () => {
   assert.equal(reports[0].picks.length, 2);
   assert.ok(reports[0].picks.every((pick) => pick.playerId !== "keeper"));
   assert.equal(reports[0].teams[0].grade, "A+");
+});
+
+test("franchise history captures the first and last recorded rosters", () => {
+  const fact = (
+    week: number,
+    playerId: string,
+    playerName: string,
+  ): WeeklyPlayerFact => ({
+    season: "2025",
+    week,
+    rosterId: 1,
+    userId: "a",
+    playerId,
+    playerName,
+    position: "RB",
+    nflTeam: "AAA",
+    points: 10,
+    starter: true,
+  });
+  const profile = buildFranchises(
+    [season],
+    [game],
+    [],
+    { standings: [], timeline: [] },
+    {},
+    [
+      fact(1, "opening", "Opening Player"),
+      fact(17, "closing", "Closing Player"),
+    ],
+  ).find((item) => item.userId === "a");
+
+  assert.equal(profile?.rosterHistory[0].openingWeek, 1);
+  assert.equal(profile?.rosterHistory[0].closingWeek, 17);
+  assert.deepEqual(
+    profile?.rosterHistory[0].opening.map((player) => player.playerName),
+    ["Opening Player"],
+  );
+  assert.deepEqual(
+    profile?.rosterHistory[0].closing.map((player) => player.playerName),
+    ["Closing Player"],
+  );
 });
 
 test("keeper candidates apply draft, waiver, and trade clocks", () => {
@@ -509,11 +535,7 @@ test("keeper candidates give in-season trades two keeper years", () => {
       },
     ],
   };
-  const candidates = buildKeeperCandidates(
-    [season],
-    [],
-    { "2025": inSeason },
-  );
+  const candidates = buildKeeperCandidates([season], [], { "2025": inSeason });
   const traded = candidates.find((candidate) => candidate.playerId === "p1");
   assert.equal(traded?.yearsRemaining, 2);
   assert.equal(traded?.tradeTiming, "in-season");

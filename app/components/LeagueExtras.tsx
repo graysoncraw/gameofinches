@@ -61,13 +61,7 @@ function savedKeeperSelections(year: string, userId: string) {
   }
 }
 
-function Initials({
-  name,
-  avatar,
-}: {
-  name: string;
-  avatar: string | null;
-}) {
+function Initials({ name, avatar }: { name: string; avatar: string | null }) {
   const src = avatarUrl(avatar);
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -366,13 +360,9 @@ export function KeeperWarRoom({
                   type="button"
                   onClick={() => toggle(candidate.playerId)}
                   key={candidate.playerId}
-                  disabled={
-                    candidate.yearsRemaining <= 0 || firstRoundBlocked
-                  }
+                  disabled={candidate.yearsRemaining <= 0 || firstRoundBlocked}
                   title={
-                    firstRoundBlocked
-                      ? FIRST_ROUND_CONFLICT_MESSAGE
-                      : undefined
+                    firstRoundBlocked ? FIRST_ROUND_CONFLICT_MESSAGE : undefined
                   }
                 >
                   <div>
@@ -422,7 +412,10 @@ export function KeeperWarRoom({
                     <strong>{candidate.playerName}</strong>
                     <p>{candidate.source}</p>
                     <b>Forfeit Round {roundFor(index)}</b>
-                    <button type="button" onClick={() => toggle(candidate.playerId)}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(candidate.playerId)}
+                    >
                       Remove
                     </button>
                   </>
@@ -606,6 +599,61 @@ export function FranchiseDossier({
           </div>
         ))}
       </div>
+      <section className="roster-history">
+        <div className="panel-title">
+          <Users size={19} aria-hidden="true" />
+          <div>
+            <span>ROSTER TIME MACHINE</span>
+            <strong>Opening and closing rosters</strong>
+          </div>
+        </div>
+        <p className="roster-history-note">
+          Opening rosters use each seasonâ€™s earliest recorded matchup week;
+          closing rosters use its latest recorded matchup week.
+        </p>
+        {profile.rosterHistory.length ? (
+          profile.rosterHistory.map((season) => (
+            <details className="roster-season" key={season.season}>
+              <summary>
+                <span>{season.season}</span>
+                <strong>{season.teamName}</strong>
+                <small>{season.opening.length} players</small>
+              </summary>
+              <div className="roster-snapshots">
+                {(
+                  [
+                    ["Opening roster", season.openingWeek, season.opening],
+                    ["Closing roster", season.closingWeek, season.closing],
+                  ] as const
+                ).map(([label, week, players]) => (
+                  <article key={label}>
+                    <header>
+                      <strong>{label}</strong>
+                      <span>Week {week}</span>
+                    </header>
+                    <div className="roster-player-list">
+                      {players.map((player) => (
+                        <div key={player.playerId}>
+                          <span>{player.position || "â€”"}</span>
+                          <strong>{player.playerName}</strong>
+                          <small>
+                            {player.nflTeam || "FA"}
+                            {player.starter ? " Â· starter" : ""}
+                          </small>
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </details>
+          ))
+        ) : (
+          <p className="profile-empty">
+            No weekly roster history is available.
+          </p>
+        )}
+      </section>
       <div className="franchise-two-up">
         <article>
           <div className="panel-title">

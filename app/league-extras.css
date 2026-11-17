@@ -543,7 +543,11 @@
 
 .franchise-page {
   background:
-    radial-gradient(circle at 80% 10%, rgba(184, 240, 84, 0.3), transparent 30%),
+    radial-gradient(
+      circle at 80% 10%,
+      rgba(184, 240, 84, 0.3),
+      transparent 30%
+    ),
     var(--paper);
 }
 
@@ -761,6 +765,100 @@
   padding: 24px 0;
 }
 
+.roster-history {
+  margin: 38px 0 22px;
+}
+
+.roster-history-note {
+  color: var(--muted);
+  font-size: 10px;
+  margin: -4px 0 18px;
+}
+
+.roster-season {
+  border-top: 1px solid var(--ink);
+}
+
+.roster-season:last-child {
+  border-bottom: 1px solid var(--ink);
+}
+
+.roster-season summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 60px 1fr auto;
+  list-style: none;
+  padding: 16px 4px;
+}
+
+.roster-season summary::-webkit-details-marker {
+  display: none;
+}
+
+.roster-season summary > span {
+  color: var(--orange);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.roster-season summary > small {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.roster-snapshots {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 0 22px;
+}
+
+.roster-snapshots > article {
+  border: 1px solid var(--line);
+  padding: 16px;
+}
+
+.roster-snapshots header {
+  align-items: center;
+  border-bottom: 2px solid var(--ink);
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.roster-snapshots header span {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.roster-player-list > div {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 35px 1fr auto;
+  min-height: 38px;
+}
+
+.roster-player-list > div:last-child {
+  border-bottom: 0;
+}
+
+.roster-player-list span,
+.roster-player-list small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.roster-player-list strong {
+  font-size: 10px;
+}
+
 @media (max-width: 1000px) {
   .superlative-grid,
   .record-book-grid {
@@ -770,7 +868,12 @@
   .keeper-lab-layout {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 700px) {
+  .roster-snapshots {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
