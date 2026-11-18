@@ -11,7 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { LeagueTransaction, TransactionFeed } from "../lib/sleeper";
+import type { LeagueTransaction, TransactionFeed } from "../lib/league-types";
 
 type TransactionFilter = "all" | "trade" | "waiver" | "free_agent";
 

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { KeeperCandidate } from "../lib/chaos";
-import type { LeagueTransaction, Team } from "../lib/sleeper";
+import type { LeagueTransaction, Team } from "../lib/league-types";
 
 type TradeAsset = {
   playerId: string;

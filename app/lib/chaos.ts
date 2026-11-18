@@ -4,9 +4,9 @@ import type {
   Season,
   Team,
   TransactionFeed,
-} from "./sleeper";
+} from "./league-types";
 
-export const CHAOS_SCHEMA_VERSION = 10;
+export const CHAOS_SCHEMA_VERSION = 11;
 
 export type WeeklyPlayerFact = {
   season: string;
@@ -117,14 +117,6 @@ export type FranchiseProfile = {
   active: boolean;
   lastSeason: string;
   teamNames: Array<{ season: string; teamName: string }>;
-  rosterHistory: Array<{
-    season: string;
-    teamName: string;
-    openingWeek: number;
-    closingWeek: number;
-    opening: FranchiseRosterPlayer[];
-    closing: FranchiseRosterPlayer[];
-  }>;
   seasons: number;
   titles: number;
   titleYears: string[];
@@ -1060,44 +1052,6 @@ export function buildFranchises(
         season: fact.season,
         week: fact.week,
       }));
-    const rosterHistory = seasonTeams.flatMap((entry) => {
-      const facts = playerFacts.filter(
-        (fact) =>
-          fact.season === entry.season && fact.userId === current.userId,
-      );
-      const weeks = [...new Set(facts.map((fact) => fact.week))].sort(
-        (a, b) => a - b,
-      );
-      const openingWeek = weeks[0];
-      const closingWeek = weeks.at(-1);
-      if (openingWeek === undefined || closingWeek === undefined) return [];
-      const rosterForWeek = (week: number): FranchiseRosterPlayer[] =>
-        facts
-          .filter((fact) => fact.week === week)
-          .map((fact) => ({
-            playerId: fact.playerId,
-            playerName: fact.playerName,
-            position: fact.position,
-            nflTeam: fact.nflTeam,
-            starter: fact.starter,
-          }))
-          .sort(
-            (a, b) =>
-              Number(b.starter) - Number(a.starter) ||
-              a.position.localeCompare(b.position) ||
-              a.playerName.localeCompare(b.playerName),
-          );
-      return [
-        {
-          season: entry.season,
-          teamName: entry.team.teamName,
-          openingWeek,
-          closingWeek,
-          opening: rosterForWeek(openingWeek),
-          closing: rosterForWeek(closingWeek),
-        },
-      ];
-    });
     return {
       userId: current.userId,
       manager: current.manager,
@@ -1109,7 +1063,6 @@ export function buildFranchises(
         season: entry.season,
         teamName: entry.team.teamName,
       })),
-      rosterHistory,
       seasons: settledTeams.length,
       titles: settledTeams.filter(
         (entry) => entry.season.champion?.userId === current.userId,

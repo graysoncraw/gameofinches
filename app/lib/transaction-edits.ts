@@ -1,5 +1,5 @@
 import type { PostgresDatabase } from "../../db";
-import type { LeagueTransaction, TransactionFeed } from "./sleeper";
+import type { LeagueTransaction, TransactionFeed } from "./league-types";
 
 export type CommissionerTransactionEdit = {
   transactionId: string;

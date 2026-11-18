@@ -7,7 +7,7 @@ import {
 import type {
   LeagueTransaction,
   TransactionFeed,
-} from "../app/lib/sleeper.ts";
+} from "../app/lib/league-types.ts";
 
 function trade(id: string, created: number): LeagueTransaction {
   return {

@@ -3,17 +3,41 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const file = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+const dashboardSource = async () =>
+  (
+    await Promise.all(
+      [
+        "app/components/LeagueDashboard.tsx",
+        "app/components/LeagueNavigation.tsx",
+        "app/components/LeagueOverview.tsx",
+        "app/components/KeeperBoard.tsx",
+      ].map(file),
+    )
+  ).join("\n");
+const sleeperSource = async () =>
+  (
+    await Promise.all(
+      [
+        "app/lib/sleeper.ts",
+        "app/lib/sleeper/snapshot-store.ts",
+        "app/lib/sleeper/schedule.ts",
+        "app/lib/sleeper/players.ts",
+        "app/lib/sleeper/season.ts",
+        "app/lib/sleeper/analytics.ts",
+      ].map(file),
+    )
+  ).join("\n");
 
 test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
   const [sleeper, schema, database, compose, dockerfile, transactions] =
     await Promise.all([
-    file("app/lib/sleeper.ts"),
-    file("db/schema.ts"),
-    file("db/index.ts"),
-    file("compose.yaml"),
-    file("Dockerfile"),
-    file("app/api/transactions/route.ts"),
-  ]);
+      sleeperSource(),
+      file("db/schema.ts"),
+      file("db/index.ts"),
+      file("compose.yaml"),
+      file("Dockerfile"),
+      file("app/api/transactions/route.ts"),
+    ]);
 
   assert.match(sleeper, /sleeper_snapshots/);
   assert.match(sleeper, /sleeper_sync_runs/);
@@ -21,7 +45,10 @@ test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
   assert.match(sleeper, /T\$\{window\}:00:00-America\/Chicago/);
   assert.match(sleeper, /fetched_date === today/);
   assert.match(sleeper, /if \(cached\) return cached/);
-  assert.match(sleeper, /const archivedPlayerFacts = snapshot\.facts\?\.players/);
+  assert.match(
+    sleeper,
+    /const archivedPlayerFacts = snapshot\.facts\?\.players/,
+  );
   assert.match(sleeper, /playerFacts: archivedPlayerFacts\.length/);
   assert.match(sleeper, /rosterFacts: archivedRosterFacts/);
   assert.match(sleeper, /losers_bracket/);
@@ -42,14 +69,15 @@ test("ships a PostgreSQL-backed, twice-daily Sleeper snapshot", async () => {
 });
 
 test("protects commissioner writes with the shared password session", async () => {
-  const [auth, session, keepers, trades, tradeDesk, adminPage] = await Promise.all([
-    file("app/lib/admin-auth.ts"),
-    file("app/api/admin/session/route.ts"),
-    file("app/api/admin/keepers/route.ts"),
-    file("app/api/admin/transactions/route.ts"),
-    file("app/admin/TradeDesk.tsx"),
-    file("app/admin/page.tsx"),
-  ]);
+  const [auth, session, keepers, trades, tradeDesk, adminPage] =
+    await Promise.all([
+      file("app/lib/admin-auth.ts"),
+      file("app/api/admin/session/route.ts"),
+      file("app/api/admin/keepers/route.ts"),
+      file("app/api/admin/transactions/route.ts"),
+      file("app/admin/TradeDesk.tsx"),
+      file("app/admin/page.tsx"),
+    ]);
 
   assert.match(auth, /COMMISSIONER_PASSWORD_HASH/);
   assert.match(auth, /COMMISSIONER_SESSION_SECRET/);
@@ -67,17 +95,20 @@ test("protects commissioner writes with the shared password session", async () =
   assert.match(tradeDesk, /Add draft pick/);
   assert.match(tradeDesk, /Original team/);
   assert.match(adminPage, /hasCommissionerSession/);
-  await assert.rejects(access(new URL("../app/chatgpt-auth.ts", import.meta.url)));
+  await assert.rejects(
+    access(new URL("../app/chatgpt-auth.ts", import.meta.url)),
+  );
 });
 
 test("includes the requested league records and keeper labels", async () => {
-  const [sleeper, records, dashboard, portal, keeperStorage] = await Promise.all([
-    file("app/lib/sleeper.ts"),
-    file("app/components/LeagueRecords.tsx"),
-    file("app/components/LeagueDashboard.tsx"),
-    file("app/admin/AdminPortal.tsx"),
-    file("app/lib/keepers.ts"),
-  ]);
+  const [sleeper, records, dashboard, portal, keeperStorage] =
+    await Promise.all([
+      sleeperSource(),
+      file("app/components/LeagueRecords.tsx"),
+      dashboardSource(),
+      file("app/admin/AdminPortal.tsx"),
+      file("app/lib/keepers.ts"),
+    ]);
 
   assert.match(sleeper, /"2023": \{ buyIn: 10, first: 100/);
   assert.match(sleeper, /"2025": \{ buyIn: 15, first: 150/);
@@ -101,12 +132,20 @@ test("includes the requested league records and keeper labels", async () => {
 });
 
 test("ships league records, superlatives, profiles, and the public Keeper Lab", async () => {
-  const [chaos, experience, schema, dashboard, historyViews, recordViews, keeperViews, retiredTeams] =
-    await Promise.all([
+  const [
+    chaos,
+    experience,
+    schema,
+    dashboard,
+    historyViews,
+    recordViews,
+    keeperViews,
+    retiredTeams,
+  ] = await Promise.all([
     file("app/lib/chaos.ts"),
     file("app/components/LeagueExtras.tsx"),
     file("db/schema.ts"),
-    file("app/components/LeagueDashboard.tsx"),
+    dashboardSource(),
     file("app/history/[view]/page.tsx"),
     file("app/records/[view]/page.tsx"),
     file("app/keepers/[view]/page.tsx"),

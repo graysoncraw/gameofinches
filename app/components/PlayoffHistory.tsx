@@ -3,15 +3,10 @@
 import { ArrowRight, ChevronDown, Crown, Medal, Trophy } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useState } from "react";
-import type { LeagueData, PlayoffMatchup, Season } from "../lib/sleeper";
+import { formatPoints as score } from "../lib/league-format";
+import type { LeagueData, PlayoffMatchup, Season } from "../lib/league-types";
 
 type DisplayMatchup = PlayoffMatchup & { fallback?: boolean };
-
-function score(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function fallbackMatchups(data: LeagueData, season: Season): DisplayMatchup[] {
   const games = data.rivalries
@@ -135,8 +130,7 @@ function PlayoffBracket({
               .filter((matchup) => matchup.round === round)
               .sort(
                 (a, b) =>
-                  Number(b.placement === 1) -
-                    Number(a.placement === 1) ||
+                  Number(b.placement === 1) - Number(a.placement === 1) ||
                   (a.placement ?? Number.MAX_SAFE_INTEGER) -
                     (b.placement ?? Number.MAX_SAFE_INTEGER) ||
                   a.matchId - b.matchId,
@@ -256,7 +250,9 @@ export default function PlayoffHistory({ data }: { data: LeagueData }) {
           <ChevronDown size={16} aria-hidden="true" />
         </label>
         {matchups.some((matchup) => matchup.fallback) && (
-          <span>Full bracket labels will finish on the next scheduled sync.</span>
+          <span>
+            Full bracket labels will finish on the next scheduled sync.
+          </span>
         )}
       </div>
 

@@ -22,7 +22,7 @@ import type {
   Season,
   Team,
   TransactionFeed,
-} from "../app/lib/sleeper.ts";
+} from "../app/lib/league-types.ts";
 
 const teamA: Team = {
   rosterId: 1,
@@ -549,14 +549,13 @@ test("franchise history captures the first and last recorded rosters", () => {
     ],
   ).find((item) => item.userId === "a");
 
-  assert.equal(profile?.rosterHistory[0].openingWeek, 1);
-  assert.equal(profile?.rosterHistory[0].closingWeek, 17);
+  assert.equal(profile?.rosterHistory[0].finalWeek, 17);
   assert.deepEqual(
-    profile?.rosterHistory[0].opening.map((player) => player.playerName),
+    profile?.rosterHistory[0].weekOne.map((player) => player.playerName),
     ["Opening Player"],
   );
   assert.deepEqual(
-    profile?.rosterHistory[0].closing.map((player) => player.playerName),
+    profile?.rosterHistory[0].finalRoster.map((player) => player.playerName),
     ["Closing Player"],
   );
 });

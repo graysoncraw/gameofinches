@@ -9,8 +9,8 @@ import {
 import {
   getLeagueData,
   getTransactionFeed,
-  type LeagueTransaction,
 } from "../../../lib/sleeper";
+import type { LeagueTransaction } from "../../../lib/league-types";
 
 export const dynamic = "force-dynamic";
 

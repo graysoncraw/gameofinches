@@ -1,0 +1,104 @@
+/* Shared browser defaults; the site uses custom CSS rather than utility classes. */
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  border: 0 solid;
+}
+
+html {
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  tab-size: 4;
+}
+
+body,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+figure,
+dl,
+dd,
+ol,
+ul {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+a {
+  color: inherit;
+  text-decoration: inherit;
+}
+b,
+strong {
+  font-weight: bolder;
+}
+small {
+  font-size: 80%;
+}
+ol,
+ul {
+  list-style: none;
+  padding: 0;
+}
+table {
+  border-collapse: collapse;
+  border-color: inherit;
+  text-indent: 0;
+}
+img,
+svg,
+video {
+  display: block;
+  vertical-align: middle;
+}
+img,
+video {
+  height: auto;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  background: transparent;
+  border-radius: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  padding: 0;
+}
+
+button,
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+textarea {
+  resize: vertical;
+}
+input::placeholder,
+textarea::placeholder {
+  color: currentColor;
+  opacity: 0.5;
+}
+[hidden]:not([hidden="until-found"]) {
+  display: none !important;
+}

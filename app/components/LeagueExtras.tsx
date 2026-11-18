@@ -34,14 +34,13 @@ import {
   hasFirstRoundKeeperConflict,
   projectKeeperCandidate,
 } from "../lib/keeper-rules";
-import type { LeagueData } from "../lib/sleeper";
+import {
+  formatPoints as number,
+  avatarUrl,
+  initials,
+} from "../lib/league-format";
+import type { LeagueData } from "../lib/league-types";
 import { keeperDeadlineForSeason } from "../lib/league-dates";
-
-function number(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
-  }).format(value);
-}
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -49,10 +48,6 @@ function money(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function avatarUrl(avatar: string | null) {
-  return avatar ? `https://sleepercdn.com/avatars/thumbs/${avatar}` : null;
 }
 
 function savedKeeperSelections(year: string, userId: string) {
@@ -75,12 +70,7 @@ function Initials({ name, avatar }: { name: string; avatar: string | null }) {
   }
   return (
     <span className="chaos-avatar chaos-avatar--fallback">
-      {name
-        .split(/\s+/)
-        .map((word) => word[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()}
+      {initials(name)}
     </span>
   );
 }
@@ -699,13 +689,17 @@ function RosterSnapshot({
           const changed = !compareTo.has(player.playerId);
           return (
             <div className="roster-player-row" key={player.playerId}>
-              <span className={`roster-position roster-position--${player.position.toLowerCase()}`}>
+              <span
+                className={`roster-position roster-position--${player.position.toLowerCase()}`}
+              >
                 {player.position}
               </span>
               <strong>{player.playerName}</strong>
               <small>{player.nflTeam}</small>
               {changed && (
-                <em className={`roster-change roster-change--${changeLabel.toLowerCase()}`}>
+                <em
+                  className={`roster-change roster-change--${changeLabel.toLowerCase()}`}
+                >
                   {changeLabel}
                 </em>
               )}
@@ -764,7 +758,9 @@ function RosterTimeMachine({ history }: { history: FranchiseRosterHistory[] }) {
       <div className="roster-turnover">
         <span>{joined} joined during the season</span>
         <span>{departed} departed</span>
-        <small>Final roster captured from Sleeper after Week {selected.finalWeek}</small>
+        <small>
+          Final roster captured from Sleeper after Week {selected.finalWeek}
+        </small>
       </div>
       <div className="roster-snapshot-grid">
         <RosterSnapshot
